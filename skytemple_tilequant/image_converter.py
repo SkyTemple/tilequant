@@ -51,13 +51,14 @@ class ImageConverter:
         self._img = img.convert('RGB')
         self._tile_width = tile_width
         self._tile_height = tile_height
-        self._reset(0, 0, 0, 0, NONE, 0)
+        self._reset(0, 0, 0, 0, NONE, 0, False)
         # TODO: Flag --transparency-color
         # TODO: Flag --without-transparency (currently implemented!)
         logger.info("[%s] Initialized. tile_width=%d, tile_height=%d", id(self), self._tile_width, self._tile_height)
 
     # noinspection PyAttributeOutsideInit
-    def _reset(self, num_palettes, colors_per_palette, color_steps, current_color_count, dither, color_limit_per_tile):
+    def _reset(self, num_palettes, colors_per_palette, color_steps,
+               current_color_count, dither, color_limit_per_tile, mosaic_limiting):
         # Number of colors per palette. Minimum is 1, the first color is always transparency.
         self._colors_per_palette = colors_per_palette
         # Maximum number of palettes to generate
@@ -70,6 +71,8 @@ class ImageConverter:
         self._dither = dither
         # The number of colors the tiles are initially limited to by the first simple tile quanting:
         self._color_limit_per_tile = color_limit_per_tile
+        # See doc of convert for description of this flag
+        self._mosaic_limiting = mosaic_limiting
         # List of all possible palettes
         # In the end this will contain any number of palettes, but they will be merged by self._merge_palettes
         # and only up to self._num_palettes entries in this list will not be None.
@@ -83,7 +86,7 @@ class ImageConverter:
         self._current_colors = []
         # Version of self._img with it's colors reduced using PIL convert to palette image.
         # Based on this image tilequant tries to fullfill the single-palette-per-tile constraint.
-        self._quantized_img = None
+        self._quantized_img = self._img.copy()
         # For debugging:
         self._dbg_last_tile_quantized_img = None
         # Object that builds merge strategies for palettes
@@ -94,7 +97,8 @@ class ImageConverter:
         self._real_palette_indices = list(range(0, self._num_palettes))
 
     def convert(self, num_palettes=16, colors_per_palette=16,
-                color_steps=4, start_colors=None, dither=NONE, color_limit_per_tile=None) -> Image.Image:
+                color_steps=4, start_colors=None, dither=NONE,
+                color_limit_per_tile=None, mosaic_limiting=True) -> Image.Image:
         """
         Perform the conversion, returns the converted indexed image.
 
@@ -109,6 +113,16 @@ class ImageConverter:
         :param color_limit_per_tile:    Limit the tiles to a specifc amount of colors they should use. Setting this
                                         lower than colors_per_palette may help increase the number of
                                         total colors in the image.
+        :param mosaic_limiting:         Enables or disables "mosaic limiting": If enabled, not only limit tiles like
+                                        described in color_limit_per_tile, but also apply those limitations to larger
+                                        areas of the image.
+                                        Example for 8x8 tiles:
+                                        [Always]:
+                                            All 8x8 blocks   are limited to color_limit_per_tile      colors
+                                        [If mosaic_limiting]:
+                                            All 16x16 blocks are limited to color_limit_per_tile * 2  colors
+                                            All 32x32 blocks are limited to color_limit_per_tile * 4  colors
+                                            ... until the block size is the entire image
 
         :return: The converted image. It will contain a palette that consists of all generated sub-palettes, one
                  after the other.
@@ -117,21 +131,34 @@ class ImageConverter:
             start_colors = num_palettes * colors_per_palette
         if color_limit_per_tile is None:
             color_limit_per_tile = colors_per_palette
-        self._reset(num_palettes, colors_per_palette, color_steps, start_colors, dither, color_limit_per_tile)
+        self._reset(num_palettes, colors_per_palette, color_steps, start_colors,
+                    dither, color_limit_per_tile, mosaic_limiting)
         logger.info("[%s] Started converting. "
                     "num_palettes=%d, colors_per_palette=%d, "
-                    "color_steps=%d, start_colors=%d, color_limit_per_tile=%d, dither=%s",
+                    "color_steps=%d, start_colors=%d, color_limit_per_tile=%d, mosaic_limiting=%s, dither=%s",
                     id(self), self._num_palettes, self._colors_per_palette,
-                    self._color_steps, start_colors, color_limit_per_tile, dither)
+                    self._color_steps, start_colors, color_limit_per_tile, mosaic_limiting, dither)
 
         # TODO: If transparency, collect transparent tiles
 
         # TODO: With transparency subtract number of palettes
         if self._current_color_count <= 1:
             raise ValueError("The requested palette specs don't contain any colors.")
-        # First do a tiled quantize: Reduce the colors of all tiles to their best 16 colors. This will hopefully
-        # lead to better results.
-        self._tiled_quantize()
+        # First do a tiled quantize: Reduce the colors of all tiles to their best self._color_limit_per_tile colors.
+        # This will hopefully lead to better results.
+        self._tiled_quantize(self._tile_width, self._tile_height, self._color_limit_per_tile)
+        # If mosaic limiting is enabled, also apply these rules to larger portions of the image, see docstring:
+        if mosaic_limiting:
+            block_width = self._tile_width * 2
+            block_height = self._tile_height * 2
+            block_colors = self._color_limit_per_tile * 2
+            while block_width < self._img.width and block_height < self._img.height:
+                self._tiled_quantize(block_width, block_height, block_colors)
+                block_width *= 2
+                block_height *= 2
+                block_colors *= 2
+
+        # Do full first color limitation
         self._quantize()
 
         while not self._try_to_fit_palettes():
@@ -142,7 +169,7 @@ class ImageConverter:
 
         # If the palette count is > num_palettes, we need to merge palettes
         if len(self._palettes) > num_palettes:
-            self._merge_palettes()  # TODO: Make sure to also change _palettes_for_tiles there.
+            self._merge_palettes()
 
         # Iterate one last time and assign the final pixel colors and then build the image from it
         return self._build_image(self._index_pixels())
@@ -222,21 +249,20 @@ class ImageConverter:
         self._palettes_for_tiles[self._tile_coord(tx, ty)] = possible_palettes
         return True
 
-    def _tiled_quantize(self):
+    def _tiled_quantize(self, block_width, block_height, color_limit):
         """
-        Reduces the colors in each tile of the image down to self._color_limit_per_tile.
-        Input: self._img
+        Reduces the colors in each block of the image down to color_limit.
+        Input: self._quantized_img
         Output: self._quantized_img
         """
-        self._quantized_img = self._img.copy()
-        for tx in self._iterate_tiles_x():
-            for ty in self._iterate_tiles_y():
+        for tx in range(0, int(self._img.width / block_width)):
+            for ty in range(0, int(self._img.height / block_height)):
                 box = (
-                    tx * self._tile_width, ty * self._tile_height,
-                    (tx + 1) * self._tile_width, (ty + 1) * self._tile_height
+                    tx * block_width, ty * block_height,
+                    (tx + 1) * block_width, (ty + 1) * block_height
                 )
-                img_tile = self._img.crop(box).convert(
-                    'P', palette=Image.ADAPTIVE, colors=self._color_limit_per_tile, dither=self._dither
+                img_tile = self._quantized_img.crop(box).convert(
+                    'P', palette=Image.ADAPTIVE, colors=color_limit, dither=self._dither
                 )
                 self._quantized_img.paste(img_tile, box)
         self._dbg_last_tile_quantized_img = self._quantized_img.copy()
@@ -324,7 +350,7 @@ class ImageConverter:
         # We can just re-use the information from last merger we used, if we already had to use one.
         logger.info("[%s] Merging palettes, please stand by...", id(self))
         if self._merger is None:
-            self._merger = self._create_new_merger(self._palettes_for_tiles.copy())
+            self._merger = self._create_new_merger()
             assert self._merger.try_to_merge()
 
         palettes_to_delete = []
