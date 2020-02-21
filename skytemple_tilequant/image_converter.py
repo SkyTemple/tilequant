@@ -31,8 +31,21 @@ Color = Tuple[int, int, int]
 
 
 class ImageConverter:
+    """
+    Converts any image into a indexed image containing a number of smaller sub-palettes, each with a fixed
+    color length. The conversion will assign each tile in the image one of these sub-palettes
+    to use (single-palette-per-tile constraint).
+    To meet this constraint the converter will continue to reduce the overall image colors using color
+    quantization until each tile can be assigned a palette.
+    """
 
     def __init__(self, img: Image.Image, tile_width=8, tile_height=8):
+        """
+        Init.
+        :param img:         Input image
+        :param tile_width:  The width of each tile in img. img must be divisible by this.
+        :param tile_height: The height of each tile in img. img must be divisible by this.
+        """
         assert img.width % tile_width == 0, f"The image width must be divisible by {tile_width}"
         assert img.height % tile_height == 0, f"The image height must be divisible by {tile_height}"
         self._img = img.convert('RGB')
@@ -57,13 +70,23 @@ class ImageConverter:
         self._dither = dither
         # The number of colors the tiles are initially limited to by the first simple tile quanting:
         self._color_limit_per_tile = color_limit_per_tile
-        # TODO DOC:
-        self._palettes: List[OrderedSet[Color]] = []
+        # List of all possible palettes
+        # In the end this will contain any number of palettes, but they will be merged by self._merge_palettes
+        # and only up to self._num_palettes entries in this list will not be None.
+        self._palettes: List[Union[None, OrderedSet[Color]]] = []
+        # Whether or not self._check_num_palette_constraint needs to perform a deep/hard merge check
         self._deep_merge_check_needed_for_run = False
+        # A list where each entry is one image tile and the values are lists of possible indices from self._palettes,
+        # that the tile could use
         self._palettes_for_tiles = []
+        # All the colors that are currently in self._quantized_img
         self._current_colors = []
+        # Version of self._img with it's colors reduced using PIL convert to palette image.
+        # Based on this image tilequant tries to fullfill the single-palette-per-tile constraint.
         self._quantized_img = None
+        # For debugging:
         self._dbg_last_tile_quantized_img = None
+        # Object that builds merge strategies for palettes
         self._merger = None
         # The indices of this map are the real final palette indices and the entries themselves
         # reference an entry in self._palette which may contain fair more palettes due to the way things
@@ -86,7 +109,9 @@ class ImageConverter:
         :param color_limit_per_tile:    Limit the tiles to a specifc amount of colors they should use. Setting this
                                         lower than colors_per_palette may help increase the number of
                                         total colors in the image.
-        :return:
+
+        :return: The converted image. It will contain a palette that consists of all generated sub-palettes, one
+                 after the other.
         """
         if start_colors is None:
             start_colors = num_palettes * colors_per_palette
@@ -128,14 +153,13 @@ class ImageConverter:
 
     def _try_to_fit_palettes(self):
         """
-        Goes over all pixels and tries to build local tile palettes from the current image colors, by
-        finding the closest color to the current pixel value.
+        Goes over all pixels and builds local tile palettes from the current image colors.
 
         Fails if more full palettes than num_palettes would be required or if a tile contains more
         colors than colors_per_palette.
 
         On failure returns False, True otherwise. If no failure occurred, the _palettes
-        field contains the palettes and the _palettes_for_tiles field the tile palette assignments.
+        field contains the palettes and the _palettes_for_tiles field the possible palette idxs the tiles could use
 
         Please note, that the number of palettes can be bigger than _num_palettes,
         because palettes might be able to be merged. If for example colors_per_palette is 8
@@ -199,6 +223,11 @@ class ImageConverter:
         return True
 
     def _tiled_quantize(self):
+        """
+        Reduces the colors in each tile of the image down to self._color_limit_per_tile.
+        Input: self._img
+        Output: self._quantized_img
+        """
         self._quantized_img = self._img.copy()
         for tx in self._iterate_tiles_x():
             for ty in self._iterate_tiles_y():
@@ -213,6 +242,12 @@ class ImageConverter:
         self._dbg_last_tile_quantized_img = self._quantized_img.copy()
 
     def _quantize(self):
+        """
+        Reduces the colors in the entire image down to self._current_color_count
+        Input: self._quantized_img
+        Output: self._quantized_img
+        :return:
+        """
         logger.debug("[%s] Quantizing down to %d total colors.", id(self), self._current_color_count)
         # PIL is a bit broken, so convert to RGB again first.
         self._quantized_img = self._quantized_img.convert('RGB').convert(
@@ -248,9 +283,12 @@ class ImageConverter:
                 possible.append(p_idx)
         return possible
 
-    def _check_num_palette_constraint(self, number_of_tiles_already_processed=None):
-        if number_of_tiles_already_processed is None:
-            number_of_tiles_already_processed = len(self._palettes_for_tiles)
+    def _check_num_palette_constraint(self):
+        """
+        Check if it's still possible with the palettes in self._palettes to get them down to
+        a total of self._num_palettes of less, by merging
+        :return:
+        """
 
         palette_color_counts = [len(p) for p in self._palettes]
         logger.debug("[%s] Updating pal list... Currently have palettes with col counts: %s",
@@ -272,11 +310,17 @@ class ImageConverter:
         # Hardest case:
         # Try to find a way to merge by actually trying to find a merge path
         logger.debug("[%s] Have to do full merge find for palettes, please stand by...", id(self))
-        self._merger = self._create_new_merger(self._palettes_for_tiles[:number_of_tiles_already_processed])
+        self._merger = self._create_new_merger()
         return self._merger.try_to_merge()
 
     def _merge_palettes(self):
-        """Merges the palettes and updates self._palette_for_tiles"""
+        """
+        Merges the palettes and updates self._palette_for_tiles and self._real_palette_indices.
+        self._real_palette_indices will contain a list of maximum self.number_palettes entries,
+        that contains indices for the list self._palettes.
+        Fills all palette slots removed during the merge in self._palettes with None, these are then skipped
+        later for self._build_image.
+        """
         # We can just re-use the information from last merger we used, if we already had to use one.
         logger.info("[%s] Merging palettes, please stand by...", id(self))
         if self._merger is None:
@@ -306,21 +350,29 @@ class ImageConverter:
         assert len(self._real_palette_indices) <= self._num_palettes
 
     def _index_pixels(self):
+        """
+        Find the color value for the final palettes for each tile, with the single-palette-per-tile constraint
+        in mind.
+        """
         logger.debug("[%s] Building pixel data...", id(self))
 
         pxs = [0 for _ in range(0, self._img.width * self._img.height)]
         for tx in self._iterate_tiles_x():
             for ty in self._iterate_tiles_y():
-                p = self._palettes_for_tiles[self._tile_coord(tx, ty)][0]
-                real_final_index = self._real_palette_indices.index(p)
+                palette_for_tile = self._palettes_for_tiles[self._tile_coord(tx, ty)][0]
+                real_final_index = self._real_palette_indices.index(palette_for_tile)
                 index_first_col = real_final_index * self._colors_per_palette
                 for x in range(tx * self._tile_width, (tx + 1) * self._tile_width):
                     for y in range(ty * self._tile_height, (ty + 1) * self._tile_height):
                         col = self._current_colors[self._quantized_img.getpixel((x, y))]
-                        pxs[y * self._img.width + x] = index_first_col + self._palettes[p].index(col)
+                        pxs[y * self._img.width + x] = index_first_col + self._palettes[palette_for_tile].index(col)
         return pxs
 
     def _build_image(self, indexed_pixels):
+        """
+        Build the final image from the provided pixel data and the palettes in self._palettes. None entries
+        in self._palettes are skipped.
+        """
         logger.debug("[%s] Building image...", id(self))
 
         im = Image.frombuffer('P', (self._img.width, self._img.height), bytearray(indexed_pixels), 'raw', 'P', 0, 1)
@@ -333,7 +385,6 @@ class ImageConverter:
             # Fill rest of palette
             p = list(p)
             p.extend([(0, 0, 0)]*(self._colors_per_palette - len(p)))
-            print(p)
             for r, g, b in p:
                 cols.append(r)
                 cols.append(g)
@@ -343,7 +394,7 @@ class ImageConverter:
         im.putpalette(cols)
         return im
 
-    def _create_new_merger(self, palettes_for_tiles):
+    def _create_new_merger(self):
         return PaletteMerger(
             self._palettes.copy(),
             self._num_palettes,
