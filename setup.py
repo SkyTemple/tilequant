@@ -18,9 +18,14 @@ setup(
     install_requires=[
         "Pillow-SIMD>=6.0.0",
         "ordered-set>=3.1.0",
-        "sortedcollections>=1.1.0"
+        "sortedcollections>=1.1.0",
+        "click>=7.0"
     ],
     classifiers=[
         # TODO
     ],
+    entry_points='''
+        [console_scripts]
+        tilequant=skytemple_tilequant.cli:main
+    ''',
 )

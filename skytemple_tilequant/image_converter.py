@@ -33,12 +33,14 @@ class ImageConverter:
     quantization until each tile can be assigned a palette.
     """
 
-    def __init__(self, img: Image.Image, tile_width=8, tile_height=8):
+    def __init__(self, img: Image.Image, tile_width=8, tile_height=8, transparent_color=None):
         """
         Init.
-        :param img:         Input image
-        :param tile_width:  The width of each tile in img. img must be divisible by this.
-        :param tile_height: The height of each tile in img. img must be divisible by this.
+        :param img:                 Input image. Is converted to RGB, alpha channel ist removed.
+        :param tile_width:          The width of each tile in img. img must be divisible by this.
+        :param tile_height:         The height of each tile in img. img must be divisible by this.
+        :param transparent_color:   A single color value that should be treated as transparent, when doing
+                                    the conversion with transparency enabled.
         """
         assert img.width % tile_width == 0, f"The image width must be divisible by {tile_width}"
         assert img.height % tile_height == 0, f"The image height must be divisible by {tile_height}"
@@ -78,7 +80,8 @@ class ImageConverter:
 
     def convert(self, num_palettes=16, colors_per_palette=16,
                 color_steps=4, max_colors=None, dither=NONE,
-                color_limit_per_tile=None, mosaic_limiting=True, low_to_high=True) -> Image.Image:
+                color_limit_per_tile=None, mosaic_limiting=True,
+                low_to_high=True, transparency=True) -> Image.Image:
         """
         Perform the conversion, returns the converted indexed image.
 
@@ -87,7 +90,8 @@ class ImageConverter:
 
         :param dither:                  Which dithering mechanism to use. Possible values: NONE, FLOYDSTEINBERG.
         :param num_palettes:            Number of palettes in the output
-        :param colors_per_palette:      Number of colors per palette
+        :param colors_per_palette:      Number of colors per palette. If transparency is enabled, the first color in
+                                        each palette is reserved for it.
         :param color_steps:             Step interval for reducing the color count on conversion failures
         :param max_colors:              Maximum overall colors to test, None means num_palettes*colors_per_palette
         :param low_to_high:             If True: Start with the lowest number of colors and go up until
@@ -112,6 +116,9 @@ class ImageConverter:
                                             All 16x16 blocks are limited to color_limit_per_tile * 2  colors
                                             All 32x32 blocks are limited to color_limit_per_tile * 4  colors
                                             ... until the block size is the entire image
+        :param transparency:            Toggle transparency. If on, reserve the first color of each palette for
+                                        transparency and import pixels with the color code specified by
+                                        transparent_color as transparency (if given).
 
         :return: The converted image. It will contain a palette that consists of all generated sub-palettes, one
                  after the other.
