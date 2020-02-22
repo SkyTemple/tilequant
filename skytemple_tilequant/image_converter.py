@@ -15,13 +15,14 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with SkyTemple.  If not, see <https://www.gnu.org/licenses/>.
-from typing import Tuple, List
+from typing import Tuple, List, Union
 
 from PIL import Image
 from PIL.Image import NONE
 
 from skytemple_tilequant import logger, Color
 from skytemple_tilequant.run import ConversionRun
+from skytemple_tilequant.transparency_handler import TransparencyHandler
 
 
 class ImageConverter:
@@ -33,7 +34,7 @@ class ImageConverter:
     quantization until each tile can be assigned a palette.
     """
 
-    def __init__(self, img: Image.Image, tile_width=8, tile_height=8, transparent_color=None):
+    def __init__(self, img: Image.Image, tile_width=8, tile_height=8, transparent_color: Color=None):
         """
         Init.
         :param img:                 Input image. Is converted to RGB, alpha channel ist removed.
@@ -47,14 +48,13 @@ class ImageConverter:
         self._img = img.convert('RGB')
         self._tile_width = tile_width
         self._tile_height = tile_height
-        self._reset(0, 0, 0, NONE, 0, False)
-        # TODO: Flag --transparency-color
-        # TODO: Flag --without-transparency (currently implemented!)
+        self._transparent_color = transparent_color
+        self._reset(0, 0, 0, NONE, 0, False, False)
         logger.info("[%s] Initialized. tile_width=%d, tile_height=%d", id(self), self._tile_width, self._tile_height)
 
     # noinspection PyAttributeOutsideInit
     def _reset(self, num_palettes, colors_per_palette, color_steps,
-               dither, color_limit_per_tile, mosaic_limiting):
+               dither, color_limit_per_tile, mosaic_limiting, transparency):
         # Number of colors per palette. Minimum is 1, the first color is always transparency.
         self._colors_per_palette = colors_per_palette
         # Maximum number of palettes to generate
@@ -67,6 +67,8 @@ class ImageConverter:
         self._color_limit_per_tile = color_limit_per_tile
         # See doc of convert for description of this flag
         self._mosaic_limiting = mosaic_limiting
+        # Transparency handler object or None if transparency is disabled
+        self._transparency = TransparencyHandler(self._transparent_color) if transparency else None
         # Whether or not self._check_num_palette_constraint needs to perform a deep/hard merge check
         self._deep_merge_check_needed_for_run = False
         # For debugging:
@@ -125,19 +127,26 @@ class ImageConverter:
         """
         if max_colors is None:
             max_colors = num_palettes * colors_per_palette
+            if transparency:
+                max_colors -= num_palettes
         if color_limit_per_tile is None:
             color_limit_per_tile = colors_per_palette
+            if transparency:
+                color_limit_per_tile -= 1
         self._reset(num_palettes, colors_per_palette, color_steps,
-                    dither, color_limit_per_tile, mosaic_limiting)
+                    dither, color_limit_per_tile, mosaic_limiting, transparency)
         logger.info("[%s] Started converting. "
                     "num_palettes=%d, colors_per_palette=%d, "
-                    "color_steps=%d, max_colors=%d, color_limit_per_tile=%d, mosaic_limiting=%s, dither=%s",
+                    "color_steps=%d, max_colors=%d, color_limit_per_tile=%d, "
+                    "mosaic_limiting=%s, dither=%s, transparency=%s",
                     id(self), self._num_palettes, self._colors_per_palette,
-                    self._color_steps, max_colors, color_limit_per_tile, mosaic_limiting, dither)
+                    self._color_steps, max_colors, color_limit_per_tile,
+                    mosaic_limiting, dither, transparency)
 
-        # TODO: If transparency, collect transparent tiles
+        if self._transparency:
+            # If transparency, collect transparent tiles
+            self._transparency.collect_and_remove_transparency(self._img)
 
-        # TODO: With transparency subtract number of palettes
         if max_colors <= 1:
             raise ValueError("The requested palette specs don't contain any colors.")
 
@@ -149,7 +158,7 @@ class ImageConverter:
             block_width = self._tile_width * 2
             block_height = self._tile_height * 2
             block_colors = self._color_limit_per_tile * 2
-            while block_width < self._img.width and block_height < self._img.height:
+            while block_width < self._img.width and block_height < self._img.height and block_colors <= 256:
                 img = self._tiled_quantize(img, block_width, block_height, block_colors)
                 block_width *= 2
                 block_height *= 2
@@ -168,10 +177,16 @@ class ImageConverter:
             # noinspection PyTypeChecker
             quant_images = reversed(quant_images)
 
+        colors_per_palette = self._colors_per_palette
+        # If transparency is enabled, run the runs with one color less,
+        # the first one is reserved for transparency
+        if transparency:
+            colors_per_palette -= 1
+
         last_working_run = None
         for color_count, quant_image, current_colors in quant_images:
             run = ConversionRun(color_count, quant_image, current_colors, self._tile_width,
-                                self._tile_height, self._num_palettes, self._colors_per_palette)
+                                self._tile_height, self._num_palettes, colors_per_palette, id(self))
             if not low_to_high:
                 # If big -> small:
                 # Go through the list and stop when first found
@@ -190,13 +205,33 @@ class ImageConverter:
             raise RuntimeError("Was unable to quantize image: Had no colors left.")
 
         self._final_color_count = last_working_run.color_count
+        logger.info("[%s] Found best, with %d total colors.",
+                    id(self), last_working_run.color_count)
 
         # If the palette count is > num_palettes, we need to merge palettes
         if len(last_working_run.palettes) > num_palettes:
             self._merge_palettes(last_working_run)
 
+        # If transparency is enabled, update the palettes to include the transparent colors
+        if self._transparency:
+            last_working_run.palettes = self._transparency.update_palettes(last_working_run.palettes)
+
+        indexed_pixels = self._index_pixels(last_working_run)
+
+        # If transparency is enabled, set the transparent pixels of the image back to transparency
+        if self._transparency:
+            last_working_run.palettes = self._transparency.set_transparent_color_in_palettes(last_working_run.palettes)
+            self._transparency.update_pixels(
+                self._img.width,
+                int(self._img.width / self._tile_width),
+                int(self._img.height / self._tile_height),
+                self._colors_per_palette,
+                self._tile_width, self._tile_height,
+                indexed_pixels
+            )
+
         # Iterate one last time and assign the final pixel colors and then build the image from it
-        return self._build_image(self._index_pixels(last_working_run), last_working_run.palettes)
+        return self._build_image(indexed_pixels, last_working_run.palettes)
 
     def color_count(self):
         """The count of colors in the last converted image"""
@@ -206,6 +241,8 @@ class ImageConverter:
         """
         Reduces the colors in each block of the image down to color_limit.
         """
+        logger.debug("[%s] Tiled quantizing down to %d colors per %d x %d block.",
+                     id(self), color_limit, block_width, block_height)
         for tx in range(0, int(self._img.width / block_width)):
             for ty in range(0, int(self._img.height / block_height)):
                 box = (
