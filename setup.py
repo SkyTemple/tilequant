@@ -17,7 +17,8 @@ setup(
     url='https://github.com/SkyTemple/skytemple-tilequant/',
     install_requires=[
         "Pillow-SIMD>=6.0.0",
-        "ordered-set>=3.0.0"
+        "ordered-set>=3.1.0",
+        "sortedcollections>=1.1.0"
     ],
     classifiers=[
         # TODO

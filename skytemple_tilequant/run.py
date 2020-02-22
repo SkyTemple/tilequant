@@ -110,17 +110,9 @@ class ConversionRun:
             current_local_tile_palette
         )
         if len(possible_palettes) < 1:
-            # For performance reasons, the check here was removed. If the complex merge check is required, this
-            # just takes too long here, do it at the end instead (end of _try_to_fit_palettes).
-            # noinspection PyUnreachableCode
-            if True:  # self._check_num_palette_constraint(self._tile_coord(tx, ty)):
-                # No palette contains all colors... We need to create a new one
-                possible_palettes = [len(self.palettes)]
-                self.palettes.append(OrderedSet(current_local_tile_palette))
-            else:
-                # We can't add new palettes anymore because we would exceed num_palettes even when merging. Abort.
-                logger.info("[%s] Impossible to limit image to %d palettes, aborting...", id(self), self._num_palettes)
-                return False
+            # No palette contains all colors... We need to create a new one
+            possible_palettes = [len(self.palettes)]
+            self.palettes.append(OrderedSet(current_local_tile_palette))
 
         logger.debug("[%s] Tile %d x %d can use palettes %s", id(self), tx, ty, possible_palettes)
         self.palettes_for_tiles[self._tile_coord(tx, ty)] = possible_palettes

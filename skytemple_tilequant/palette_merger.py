@@ -15,9 +15,6 @@
 #  You should have received a copy of the GNU General Public License
 #  along with SkyTemple.  If not, see <https://www.gnu.org/licenses/>.
 import itertools
-import operator
-import time
-from collections import OrderedDict
 from typing import List, Tuple
 
 from ordered_set import OrderedSet
