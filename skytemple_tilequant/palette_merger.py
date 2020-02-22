@@ -37,6 +37,7 @@ class PaletteMerger:
         :param num_palettes: The number of palettes to reduce down to
         :param colors_per_palette: The number of colors per palette
         """
+        self.was_run = False
         self._palettes = [p.copy() for p in palettes]
         self._current_number_of_palettes = len(palettes)
         self._num_palettes = num_palettes
@@ -81,6 +82,7 @@ class PaletteMerger:
         After calling this method with a return auf True, the method get_merge_operations returns a list of merge
         operations that can be performed to get down to self._num_palettes.
         """
+        self.was_run = True
         return self._try_to_merge__recursion()
 
     def _try_to_merge__recursion(self):

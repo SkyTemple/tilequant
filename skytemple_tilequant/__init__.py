@@ -14,4 +14,9 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with SkyTemple.  If not, see <https://www.gnu.org/licenses/>.
+import logging
+from typing import Tuple
 
+logging.basicConfig()
+logger = logging.getLogger('skytemple_tilequant')
+Color = Tuple[int, int, int]
