@@ -16,9 +16,12 @@
 #  along with SkyTemple.  If not, see <https://www.gnu.org/licenses/>.
 import itertools
 import operator
-from typing import List, Tuple, Dict, TYPE_CHECKING
+import time
+from collections import OrderedDict
+from typing import List, Tuple
 
 from ordered_set import OrderedSet
+from sortedcollections import ValueSortedDict
 
 
 class PaletteMerger:
@@ -39,7 +42,9 @@ class PaletteMerger:
         self._num_palettes = num_palettes
         self._colors_per_palette = colors_per_palette
         self._merges_performed: List[Tuple[int, int]] = []
-        self._removed_palettes = []
+        self._count_per_pal = ValueSortedDict(
+            {pidx: -len(p) for pidx, p in enumerate(self._palettes)}
+        )
 
     @classmethod
     def try_fast_merge(cls, palettes, colors_per_palette, num_palettes):
@@ -70,7 +75,7 @@ class PaletteMerger:
         This merge uses unions of the palettes, so merged palettes don't contain duplicate colors, unlike the fast
         check.
 
-        This still doesn't test all possible options, but by using the combinations that occur the most, this
+        This still doesn't test all possible options, but by sorting by palette color count descending, this
         has a pretty high success rate. And checking all possible cases would just take too much time.
 
         After calling this method with a return auf True, the method get_merge_operations returns a list of merge
@@ -81,19 +86,23 @@ class PaletteMerger:
     def _try_to_merge__recursion(self):
         if self._current_number_of_palettes <= self._num_palettes:
             return True
-        count_per_pal = {pidx: len(p) for pidx, p in enumerate(self._palettes) if pidx not in self._removed_palettes}
+
+        # TODO: Creating and iterating a list of all combinations over and over
+        #       takes VERY long if no match can be found.
         max_combinations = list(itertools.combinations([
-            pal_idx for pal_idx, _ in sorted(count_per_pal.items(), key=operator.itemgetter(1))
+            pal_idx for pal_idx, c in self._count_per_pal.items() if c <= self._colors_per_palette
         ], 2))
 
         # Find first combination that can be merged
         for i, pal_pair in enumerate(max_combinations):
             new_colors = self._merge_two_pal(pal_pair)
-            if len(new_colors) <= self._colors_per_palette:
+            len_new_colors = len(new_colors)
+            if len_new_colors <= self._colors_per_palette:
                 # Merge by merging to pal_pair[0] and setting the reference in 1 to 0.
-                self._merges_performed.append([pal_pair[0], pal_pair[1]])
+                self._merges_performed.append(pal_pair)
                 self._palettes[pal_pair[0]] = new_colors
-                self._removed_palettes.append(pal_pair[1])
+                self._count_per_pal[pal_pair[0]] = -len_new_colors
+                del self._count_per_pal[pal_pair[1]]
                 self._current_number_of_palettes -= 1
                 # Recursively start again
                 return self._try_to_merge__recursion()
