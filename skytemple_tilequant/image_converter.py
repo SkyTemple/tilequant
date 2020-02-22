@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU General Public License
 #  along with SkyTemple.  If not, see <https://www.gnu.org/licenses/>.
 import logging
-from typing import Tuple, List
+from typing import Tuple, List, Union, Iterable
 
 from PIL import Image
 from PIL.Image import NONE
@@ -51,22 +51,20 @@ class ImageConverter:
         self._img = img.convert('RGB')
         self._tile_width = tile_width
         self._tile_height = tile_height
-        self._reset(0, 0, 0, 0, NONE, 0, False)
+        self._reset(0, 0, 0, NONE, 0, False)
         # TODO: Flag --transparency-color
         # TODO: Flag --without-transparency (currently implemented!)
         logger.info("[%s] Initialized. tile_width=%d, tile_height=%d", id(self), self._tile_width, self._tile_height)
 
     # noinspection PyAttributeOutsideInit
     def _reset(self, num_palettes, colors_per_palette, color_steps,
-               current_color_count, dither, color_limit_per_tile, mosaic_limiting):
+               dither, color_limit_per_tile, mosaic_limiting):
         # Number of colors per palette. Minimum is 1, the first color is always transparency.
         self._colors_per_palette = colors_per_palette
         # Maximum number of palettes to generate
         self._num_palettes = num_palettes
         # How many colors to subtract with each attempt of quantization
         self._color_steps = color_steps
-        # The number of colors in the current image
-        self._current_color_count = current_color_count
         # Which dithering algorithm to use
         self._dither = dither
         # The number of colors the tiles are initially limited to by the first simple tile quanting:
@@ -82,11 +80,6 @@ class ImageConverter:
         # A list where each entry is one image tile and the values are lists of possible indices from self._palettes,
         # that the tile could use
         self._palettes_for_tiles = []
-        # All the colors that are currently in self._quantized_img
-        self._current_colors = []
-        # Version of self._img with it's colors reduced using PIL convert to palette image.
-        # Based on this image tilequant tries to fullfill the single-palette-per-tile constraint.
-        self._quantized_img = self._img.copy()
         # For debugging:
         self._dbg_last_tile_quantized_img = None
         # Object that builds merge strategies for palettes
@@ -95,10 +88,12 @@ class ImageConverter:
         # reference an entry in self._palette which may contain fair more palettes due to the way things
         # may be merged.
         self._real_palette_indices = list(range(0, self._num_palettes))
+        # The last color count after convert
+        self._final_color_count = 0
 
     def convert(self, num_palettes=16, colors_per_palette=16,
-                color_steps=4, start_colors=None, dither=NONE,
-                color_limit_per_tile=None, mosaic_limiting=True) -> Image.Image:
+                color_steps=4, max_colors=None, dither=NONE,
+                color_limit_per_tile=None, mosaic_limiting=True, low_to_high=True) -> Image.Image:
         """
         Perform the conversion, returns the converted indexed image.
 
@@ -109,8 +104,17 @@ class ImageConverter:
         :param num_palettes:            Number of palettes in the output
         :param colors_per_palette:      Number of colors per palette
         :param color_steps:             Step interval for reducing the color count on conversion failures
-        :param start_colors:            Number of colors to start with, None means num_palettes*colors_per_palette
-        :param color_limit_per_tile:    Limit the tiles to a specifc amount of colors they should use. Setting this
+        :param max_colors:              Maximum overall colors to test, None means num_palettes*colors_per_palette
+        :param low_to_high:             If True: Start with the lowest number of colors and go up until
+                                        not possible anymore.
+                                        If False: Start with highest number of colors and go down until possible.
+                                        What's faster depends on the image, for most general images low_to_high is
+                                        better.
+                                        There is a chance for some images, especially once already in a format close to
+                                        the one the converter creates, that low_to_high will not return the best result,
+                                        because some color counts in-between may not be convertible, while higher ones
+                                        are. This has to do with the color quantization algorithms used.
+        :param color_limit_per_tile:    Limit the tiles to a specific amount of colors they should use. Setting this
                                         lower than colors_per_palette may help increase the number of
                                         total colors in the image.
         :param mosaic_limiting:         Enables or disables "mosaic limiting": If enabled, not only limit tiles like
@@ -127,58 +131,102 @@ class ImageConverter:
         :return: The converted image. It will contain a palette that consists of all generated sub-palettes, one
                  after the other.
         """
-        if start_colors is None:
-            start_colors = num_palettes * colors_per_palette
+        if max_colors is None:
+            max_colors = num_palettes * colors_per_palette
         if color_limit_per_tile is None:
             color_limit_per_tile = colors_per_palette
-        self._reset(num_palettes, colors_per_palette, color_steps, start_colors,
+        self._reset(num_palettes, colors_per_palette, color_steps,
                     dither, color_limit_per_tile, mosaic_limiting)
         logger.info("[%s] Started converting. "
                     "num_palettes=%d, colors_per_palette=%d, "
-                    "color_steps=%d, start_colors=%d, color_limit_per_tile=%d, mosaic_limiting=%s, dither=%s",
+                    "color_steps=%d, max_colors=%d, color_limit_per_tile=%d, mosaic_limiting=%s, dither=%s",
                     id(self), self._num_palettes, self._colors_per_palette,
-                    self._color_steps, start_colors, color_limit_per_tile, mosaic_limiting, dither)
+                    self._color_steps, max_colors, color_limit_per_tile, mosaic_limiting, dither)
 
         # TODO: If transparency, collect transparent tiles
 
         # TODO: With transparency subtract number of palettes
-        if self._current_color_count <= 1:
+        if max_colors <= 1:
             raise ValueError("The requested palette specs don't contain any colors.")
         # First do a tiled quantize: Reduce the colors of all tiles to their best self._color_limit_per_tile colors.
         # This will hopefully lead to better results.
-        self._tiled_quantize(self._tile_width, self._tile_height, self._color_limit_per_tile)
+        img = self._tiled_quantize(self._img.copy(), self._tile_width, self._tile_height, self._color_limit_per_tile)
         # If mosaic limiting is enabled, also apply these rules to larger portions of the image, see docstring:
         if mosaic_limiting:
             block_width = self._tile_width * 2
             block_height = self._tile_height * 2
             block_colors = self._color_limit_per_tile * 2
             while block_width < self._img.width and block_height < self._img.height:
-                self._tiled_quantize(block_width, block_height, block_colors)
+                img = self._tiled_quantize(img, block_width, block_height, block_colors)
                 block_width *= 2
                 block_height *= 2
                 block_colors *= 2
 
-        # Do full first color limitation
-        self._quantize()
+        # Do prepare all color quantization
+        prepare_color_count = max_colors
+        quant_images: List[Tuple[int, Image, List[Color]]] = []
+        while prepare_color_count > 0:
+            q_result = self._quantize(img, prepare_color_count)
+            quant_images.append((prepare_color_count, q_result[0], q_result[1]))
+            prepare_color_count -= self._color_steps
 
-        while not self._try_to_fit_palettes():
-            self._current_color_count -= self._color_steps
-            if self._current_color_count <= 1:
-                raise RuntimeError("Was unable to quantize image: Had no colors left.")
-            self._quantize()
+        # Go up instead flag set
+        if low_to_high:
+            # noinspection PyTypeChecker
+            quant_images = reversed(quant_images)
+
+        found = False
+        last_working_color_count = 0
+        last_working_quant_img = img
+        last_working_colors = []
+        # TODO: Should clean this up (other object), adding the possibility to run things backwards made this messy...
+        last_working_palettes = self._palettes
+        last_working_palttes_for_tiles = self._palettes_for_tiles
+        last_working_merger = self._merger
+        for color_count, quant_image, current_colors in quant_images:
+            if not low_to_high:
+                # If big -> small:
+                # Go through the list and stop when first found
+                if self._try_to_fit_palettes(color_count, quant_image, current_colors):
+                    found = True
+                    last_working_color_count = color_count
+                    last_working_quant_img = quant_image
+                    last_working_colors = current_colors
+                    break
+            else:
+                # If small -> big:
+                # Go through the list and stop until no longer found
+                if not self._try_to_fit_palettes(color_count, quant_image, current_colors):
+                    self._palettes = last_working_palettes
+                    self._palettes_for_tiles = last_working_palttes_for_tiles
+                    self._merger = last_working_merger
+                    break
+                else:
+                    found = True
+                    last_working_color_count = color_count
+                    last_working_quant_img = quant_image
+                    last_working_colors = current_colors
+                    last_working_palettes = self._palettes
+                    last_working_palttes_for_tiles = self._palettes_for_tiles
+                    last_working_merger = self._merger
+
+        if not found:
+            raise RuntimeError("Was unable to quantize image: Had no colors left.")
+
+        self._final_color_count = last_working_color_count
 
         # If the palette count is > num_palettes, we need to merge palettes
         if len(self._palettes) > num_palettes:
             self._merge_palettes()
 
         # Iterate one last time and assign the final pixel colors and then build the image from it
-        return self._build_image(self._index_pixels())
+        return self._build_image(self._index_pixels(last_working_colors, last_working_quant_img))
 
     def color_count(self):
         """The count of colors in the last converted image"""
-        return self._current_color_count
+        return self._final_color_count
 
-    def _try_to_fit_palettes(self):
+    def _try_to_fit_palettes(self, color_count, quantized_img, current_colors):
         """
         Goes over all pixels and builds local tile palettes from the current image colors.
 
@@ -201,17 +249,17 @@ class ImageConverter:
         self._deep_merge_check_needed_for_run = False
 
         logger.info("[%s] Trying to fit palettes with %d total colors.",
-                    id(self), self._current_color_count)
+                    id(self), color_count)
 
         # Iterate tiles:
         for ty in self._iterate_tiles_y():
             for tx in self._iterate_tiles_x():
-                success = self._index_tile(tx, ty)
+                success = self._index_tile(tx, ty, current_colors, quantized_img)
                 if not success:
                     return False
         return self._check_num_palette_constraint()
 
-    def _index_tile(self, tx, ty):
+    def _index_tile(self, tx, ty, current_colors, quantized_img):
         current_local_tile_palette = OrderedSet()
         logger.debug("[%s] Processing tile %d x %d", id(self), tx, ty)
 
@@ -219,8 +267,8 @@ class ImageConverter:
         for y in range(ty * self._tile_height, (ty + 1) * self._tile_height):
             for x in range(tx * self._tile_width, (tx + 1) * self._tile_width):
                 # TODO: With transparency, make sure cc_idx is still correct!
-                cc_idx = self._quantized_img.getpixel((x, y))
-                cc = self._current_colors[cc_idx]
+                cc_idx = quantized_img.getpixel((x, y))
+                cc = current_colors[cc_idx]
                 current_local_tile_palette.append(cc)
 
         if len(current_local_tile_palette) > self._colors_per_palette:
@@ -249,11 +297,9 @@ class ImageConverter:
         self._palettes_for_tiles[self._tile_coord(tx, ty)] = possible_palettes
         return True
 
-    def _tiled_quantize(self, block_width, block_height, color_limit):
+    def _tiled_quantize(self, img, block_width, block_height, color_limit):
         """
         Reduces the colors in each block of the image down to color_limit.
-        Input: self._quantized_img
-        Output: self._quantized_img
         """
         for tx in range(0, int(self._img.width / block_width)):
             for ty in range(0, int(self._img.height / block_height)):
@@ -261,27 +307,26 @@ class ImageConverter:
                     tx * block_width, ty * block_height,
                     (tx + 1) * block_width, (ty + 1) * block_height
                 )
-                img_tile = self._quantized_img.crop(box).convert(
+                img_tile = img.crop(box).convert(
                     'P', palette=Image.ADAPTIVE, colors=color_limit, dither=self._dither
                 )
-                self._quantized_img.paste(img_tile, box)
-        self._dbg_last_tile_quantized_img = self._quantized_img.copy()
+                img.paste(img_tile, box)
+        self._dbg_last_tile_quantized_img = img.copy()
+        return img
 
-    def _quantize(self):
+    def _quantize(self, img, color_count) -> Tuple[Image.Image, List[Color]]:
         """
         Reduces the colors in the entire image down to self._current_color_count
-        Input: self._quantized_img
-        Output: self._quantized_img
         :return:
         """
-        logger.debug("[%s] Quantizing down to %d total colors.", id(self), self._current_color_count)
+        logger.debug("[%s] Quantizing down to %d total colors.", id(self), color_count)
         # PIL is a bit broken, so convert to RGB again first.
-        self._quantized_img = self._quantized_img.convert('RGB').convert(
-            'P', palette=Image.ADAPTIVE, colors=self._current_color_count, dither=self._dither
+        img = img.convert('RGB').convert(
+            'P', palette=Image.ADAPTIVE, colors=color_count, dither=self._dither
         )
-        it = iter(self._quantized_img.getpalette()[:self._current_color_count*3])
+        it = iter(img.getpalette()[:color_count*3])
         # zip converts the palette into rgb tuples: [(r,g,b),(r,g,b)...]
-        self._current_colors = list(zip(it, it, it))
+        return img, list(zip(it, it, it))
 
     def _iterate_tiles_x(self):
         return range(0, int(self._img.width / self._tile_width))
@@ -375,7 +420,7 @@ class ImageConverter:
                 self._real_palette_indices.append(p_idx)
         assert len(self._real_palette_indices) <= self._num_palettes
 
-    def _index_pixels(self):
+    def _index_pixels(self, current_colors, quantized_img):
         """
         Find the color value for the final palettes for each tile, with the single-palette-per-tile constraint
         in mind.
@@ -390,7 +435,7 @@ class ImageConverter:
                 index_first_col = real_final_index * self._colors_per_palette
                 for x in range(tx * self._tile_width, (tx + 1) * self._tile_width):
                     for y in range(ty * self._tile_height, (ty + 1) * self._tile_height):
-                        col = self._current_colors[self._quantized_img.getpixel((x, y))]
+                        col = current_colors[quantized_img.getpixel((x, y))]
                         pxs[y * self._img.width + x] = index_first_col + self._palettes[palette_for_tile].index(col)
         return pxs
 
