@@ -22,7 +22,13 @@ setup(
         "click>=7.0"
     ],
     classifiers=[
-        # TODO
+        'Development Status :: 3 - Alpha',
+        'Programming Language :: Python',
+        'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
+        'Topic :: Multimedia :: Graphics',
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
     ],
     entry_points='''
         [console_scripts]

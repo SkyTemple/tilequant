@@ -1,6 +1,26 @@
 tilequant
 =========
 
+|build| |pypi-version| |pypi-downloads| |pypi-license| |pypi-pyversions|
+
+.. |build| image:: https://jenkins.riptide.parakoopa.de/buildStatus/icon?job=tilequant%2Fmaster
+    :target: https://jenkins.riptide.parakoopa.de/blue/organizations/jenkins/tilequant/activity
+    :alt: Build Status
+
+.. |pypi-version| image:: https://img.shields.io/pypi/v/tilequant
+    :target: https://pypi.org/project/tilequant/
+    :alt: Version
+
+.. |pypi-downloads| image:: https://img.shields.io/pypi/dm/tilequant
+    :target: https://pypi.org/project/tilequant/
+    :alt: Downloads
+
+.. |pypi-license| image:: https://img.shields.io/pypi/l/tilequant
+    :alt: License (MIT)
+
+.. |pypi-pyversions| image:: https://img.shields.io/pypi/pyversions/tilequant
+    :alt: Supported Python versions
+
 Tilequant is a utility to reduce the colors in an image (quantizing).
 
 It does so, while limiting each tile (by default an area of 8x8 pixels) of the image
@@ -18,10 +38,18 @@ has some problems with converting other image types to RGB in some cases.
 
 The output is an image with a palettes as shown in the example.
 
-.. image:: examples/export_example.png
+.. image:: https://github.com/SkyTemple/tilequant/raw/master/examples/export_example.png
 
 This tool is not affiliated with Nintendo, Spike Chunsoft or any of the parties involved in
 creating Pokémon Mystery Dungeon Explorers of Sky. This is a fan-project.
+
+Installation
+------------
+Python 3 is required.
+
+Via pip3::
+
+    pip3 install -U tilequant
 
 Usage
 -----
