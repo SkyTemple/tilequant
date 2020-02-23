@@ -14,7 +14,7 @@ setup(
     description='Tool for quantizing image colors using tile-based palette restrictions',
     long_description=long_description,
     long_description_content_type='text/x-rst',
-    url='https://github.com/SkyTemple/skytemple-tilequant/',
+    url='https://github.com/SkyTemple/tilequant/',
     install_requires=[
         "Pillow-SIMD>=6.0.0",
         "ordered-set>=3.1.0",

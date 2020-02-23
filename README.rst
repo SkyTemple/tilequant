@@ -38,7 +38,7 @@ has some problems with converting other image types to RGB in some cases.
 
 The output is an image with a palettes as shown in the example.
 
-.. image:: https://github.com/SkyTemple/tilequant/raw/master/examples/export_example.png
+.. image:: https://github.com/SkyTemple/tilequant/raw/master/examples/export_example2.png
 
 This tool is not affiliated with Nintendo, Spike Chunsoft or any of the parties involved in
 creating Pokémon Mystery Dungeon Explorers of Sky. This is a fan-project.
