@@ -58,7 +58,7 @@ class TransparencyHandler:
                 new_palettes.append(None)
         return new_palettes
 
-    def set_transparent_color_in_palettes(self, palettes: List[Union[None, OrderedSet]]):
+    def set_transparent_color_in_palettes(self, palettes: List[Union[None, OrderedSet]]) -> List[Union[None, List]]:
         """
         Set the first color in all None palettes to self.transparent_color or (0, 0, 0) if not defined
         """
@@ -66,7 +66,7 @@ class TransparencyHandler:
         new_palettes = []
         for p in palettes:
             if p is not None:
-                new_palettes.append(OrderedSet([tc] + list(p[1:])))
+                new_palettes.append([tc] + list(p[1:]))
             else:
                 new_palettes.append(None)
         return new_palettes
