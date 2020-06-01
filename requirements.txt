@@ -1,4 +1,4 @@
-Pillow-SIMD==6.0.0.post0
+Pillow==7.1.2
 ordered-set==3.1.1
 sortedcollections==1.1.2
 click==7.0

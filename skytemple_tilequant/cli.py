@@ -19,7 +19,10 @@ import os
 
 import click
 from PIL.Image import FLOYDSTEINBERG, NONE
-from PIL import Image
+try:
+    from PIL import Image
+except ImportError:
+    from pil import Image
 from click import echo, ClickException
 
 from skytemple_tilequant import logger

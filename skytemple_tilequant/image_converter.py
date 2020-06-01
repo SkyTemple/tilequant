@@ -17,8 +17,12 @@
 #  along with SkyTemple.  If not, see <https://www.gnu.org/licenses/>.
 from typing import Tuple, List, Union
 
-from PIL import Image
-from PIL.Image import NONE
+try:
+    from PIL import Image
+    from PIL.Image import NONE
+except ImportError:
+    from pil import Image
+    from pil.Image import NONE
 
 from skytemple_tilequant import logger, Color
 from skytemple_tilequant.run import ConversionRun

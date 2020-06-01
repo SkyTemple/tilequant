@@ -17,7 +17,10 @@
 #  along with SkyTemple.  If not, see <https://www.gnu.org/licenses/>.
 from typing import List, Union
 
-from PIL import Image
+try:
+    from PIL import Image
+except ImportError:
+    from pil import Image
 from ordered_set import OrderedSet
 
 from skytemple_tilequant import Color, logger

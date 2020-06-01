@@ -16,7 +16,7 @@ setup(
     long_description_content_type='text/x-rst',
     url='https://github.com/SkyTemple/tilequant/',
     install_requires=[
-        "Pillow-SIMD>=6.0.0",
+        'Pillow >= 6.1.0',
         "ordered-set>=3.1.0",
         "sortedcollections>=1.1.0",
         "click>=7.0"
