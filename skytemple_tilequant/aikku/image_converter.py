@@ -19,6 +19,7 @@ import math
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 from itertools import chain
 from typing import List, Optional
@@ -151,6 +152,11 @@ class AikkuImageConverter:
             # Run Tilequant
             try:
                 prefix = os.path.join(get_package_dir(), '')
+                if os.path.exists(f'{prefix}tilequant') and not sys.platform.startswith('win'):
+                    import stat
+                    st = os.stat(f'{prefix}tilequant')
+                    if not st.st_mode & stat.S_IEXEC:
+                        os.chmod(f'{prefix}tilequant', st.st_mode | stat.S_IEXEC)
                 result = subprocess.Popen([f'{prefix}tilequant', input_name, output_name,
                                            str(num_palettes), str(colors_per_palette)],
                                           stdout=subprocess.PIPE,

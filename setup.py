@@ -93,7 +93,7 @@ class BuildExt(build_ext):
 
 setup(
     name='tilequant',
-    version='0.1.0',
+    version='0.1.0.post1',
     packages=find_packages(),
     description='Tool for quantizing image colors using tile-based palette restrictions',
     long_description=long_description,
