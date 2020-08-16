@@ -14,17 +14,4 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with SkyTemple.  If not, see <https://www.gnu.org/licenses/>.
-import os
 
-from skytemple_tilequant import Color
-
-
-# noinspection PyTypeChecker
-def convert_hex_str_color_to_tuple(h: str) -> Color:
-    if h is None:
-        return None
-    return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
-
-
-def get_package_dir():
-    return os.path.abspath(os.path.dirname(__file__))

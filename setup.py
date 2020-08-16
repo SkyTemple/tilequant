@@ -1,5 +1,16 @@
 from setuptools import setup, find_packages
 
+from setuptools.command.build_ext import build_ext
+from setuptools.command.install import install
+from setuptools.command.develop import develop
+
+import os
+import shutil
+import subprocess
+import sys
+from distutils.dist import Distribution
+
+
 # README read-in
 from os import path
 this_directory = path.abspath(path.dirname(__file__))
@@ -7,9 +18,82 @@ with open(path.join(this_directory, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 # END README read-in
 
+
+is_installed_develop = False
+class BinaryDistribution(Distribution):
+    def is_pure(self):
+        return False
+
+    def has_ext_modules(self):
+        return True
+
+
+# Bug in distutils; see https://github.com/google/or-tools/issues/616#issuecomment-371480314
+class InstallPlatlib(install):
+    def finalize_options(self):
+        install.finalize_options(self)
+        if self.distribution.has_ext_modules():
+            self.install_lib = self.install_platlib
+
+
+class Develop(develop):
+    def run(self):
+        global is_installed_develop
+        is_installed_develop = True
+        super().run()
+
+
+class BuildExt(build_ext):
+    """Compiles Aikku's tilequant."""
+    def run(self):
+        # Don't build in develop
+        global is_installed_develop
+        if is_installed_develop:
+            return
+        from git import Repo
+
+        this_path = os.getcwd()
+        path_repo = os.path.join(this_path, '__aikku93_tilequant')
+
+        # Clone the repository - TODO: Switch to stable tar/zip download at some point.
+        if not os.path.exists(path_repo):
+            print("Cloning Aikku93's tilequant repository.")
+            repo = Repo.clone_from("https://github.com/SkyTemple/aikku93-tilequant.git", path_repo)
+        # Run the build script
+        exes = self.build(path_repo)
+        if not exes:
+            print("Could not compile Tilequant.")
+            print("")
+            sys.exit(1)
+        os.chdir(this_path)
+
+        # Copy the libraries to the correct place
+        for exe in exes:
+            build_target = os.path.join(
+                self.build_lib, 'skytemple_tilequant',
+                os.path.basename(exe)
+            )
+            print(f"Copying {exe} -> {build_target}")
+            shutil.copyfile(exe, build_target)
+
+    def build(self, p):
+        os.chdir(p)
+        print(f"BUILDING - make")
+        retcode = subprocess.call("make", shell=True)
+        if retcode:
+            return False
+        exes = []
+        without_exe_path = os.path.abspath(os.path.join(p, 'release', 'tilequant'))
+        with_exe_path = os.path.abspath(os.path.join(p, 'release', 'tilequant.exe'))
+        if os.path.exists(without_exe_path):
+            exes.append(without_exe_path)
+        if os.path.exists(with_exe_path):
+            exes.append(with_exe_path)
+        return exes
+
 setup(
     name='tilequant',
-    version='0.0.1.post1',
+    version='0.1.0',
     packages=find_packages(),
     description='Tool for quantizing image colors using tile-based palette restrictions',
     long_description=long_description,
@@ -21,6 +105,7 @@ setup(
         "sortedcollections>=1.1.0",
         "click>=7.0"
     ],
+    package_data={'skytemple_tilequant': ['tilequant*']},
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Programming Language :: Python',
@@ -32,6 +117,9 @@ setup(
     ],
     entry_points='''
         [console_scripts]
-        tilequant=skytemple_tilequant.cli:main
+        tilequant=skytemple_tilequant.aikku.cli:main
+        tilequant_legacy=skytemple_tilequant.cli_legacy:main
     ''',
+    distclass=BinaryDistribution,
+    cmdclass={'build_ext': BuildExt, 'install': InstallPlatlib, 'develop': Develop}
 )

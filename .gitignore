@@ -108,3 +108,6 @@ venv.bak/
 .idea/
 ### skytemple
 dbg_output
+__aikku93_tilequant/
+skytemple_tilequant/tilequant.exe
+skytemple_tilequant/tilequant

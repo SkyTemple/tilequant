@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU General Public License
 #  along with SkyTemple.  If not, see <https://www.gnu.org/licenses/>.
 import math
-from typing import List, Union
+from typing import List, Union, Iterable
 
 try:
     from PIL import Image
@@ -48,7 +48,7 @@ class TransparencyHandler:
                 self.transparency_map.append(False)
                 last_color = px
 
-    def update_palettes(self, palettes: List[Union[None, OrderedSet]]) -> List[Union[None, OrderedSet]]:
+    def update_palettes(self, palettes: List[Union[None, Iterable]]) -> List[Union[None, OrderedSet]]:
         """
         Add the index for this transparent color to all palettes that are not None.
         The index is not filled with a color yet, this is done in set_transparent_color_in_palettes.
@@ -61,7 +61,7 @@ class TransparencyHandler:
                 new_palettes.append(None)
         return new_palettes
 
-    def set_transparent_color_in_palettes(self, palettes: List[Union[None, OrderedSet]]) -> List[Union[None, List]]:
+    def set_transparent_color_in_palettes(self, palettes: List[Union[None, Iterable]]) -> List[Union[None, List]]:
         """
         Set the first color in all None palettes to self.transparent_color or (0, 0, 0) if not defined
         """
@@ -75,21 +75,29 @@ class TransparencyHandler:
         return new_palettes
 
     def update_pixels(self, img_width, w_in_tiles, h_in_tiles, colors_per_palettes,
-                      tile_width, tile_height, indexed_pixels):
+                      tile_width, tile_height, indexed_pixels=None, image=None):
         """
         Update indexed_pixels by setting the pixels in all tiles, that were originally self.transparent_color
         back to this color (their local color 0).
+        Either indexed_pixels or image must be provided.
         """
         if self.transparent_color is None:
             return
 
         for tx in range(0, w_in_tiles):
             for ty in range(0, h_in_tiles):
-                palette_for_tile = math.floor(indexed_pixels[
-                                                  (ty * tile_height * img_width) + (tx * tile_width)
-                                              ] / colors_per_palettes)
-                print(palette_for_tile)
+                if indexed_pixels:
+                    palette_for_tile = math.floor(indexed_pixels[
+                                                      (ty * tile_height * img_width) + (tx * tile_width)
+                                                  ] / colors_per_palettes)
+                else:
+                    palette_for_tile = math.floor(
+                        image.getpixel((tx * tile_width, ty * tile_height)) / colors_per_palettes
+                    )
                 for x in range(tx * tile_width, (tx + 1) * tile_width):
                     for y in range(ty * tile_height, (ty + 1) * tile_height):
                         if self.transparency_map[y * img_width + x]:
-                            indexed_pixels[y * img_width + x] = palette_for_tile * colors_per_palettes
+                            if indexed_pixels:
+                                indexed_pixels[y * img_width + x] = palette_for_tile * colors_per_palettes
+                            else:
+                                image.putpixel((x, y), palette_for_tile * colors_per_palettes)

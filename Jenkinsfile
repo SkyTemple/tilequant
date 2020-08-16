@@ -8,16 +8,19 @@ pipeline {
 
         stage('Build') {
             steps {
-                // Setup virtual env
-                sh "rm -rf .venv || true"
-                sh "virtualenv .venv"
+                script {
+                    // Setup virtual env
+                    sh "rm -rf .venv || true"
+                    sh "virtualenv .venv"
 
-                // Run build
-                sh "rm -rf dist build || true"
-                sh '''. .venv/bin/activate
-                      pip3 install -r requirements.txt
-                      python3 setup.py bdist_wheel
-                '''
+                    // Run build
+                    sh "rm -rf dist build || true"
+                    wd = pwd()
+                    docker.image("quay.io/pypa/manylinux2014_x86_64").inside("-v ${wd}:/io -u root") {
+                          sh '/io/build-manylinux.sh'
+                          sh "rm /io/py_desmume.egg-info -rf"
+                    }
+                }
             }
             post {
                 always {
@@ -34,7 +37,7 @@ pipeline {
                 TWINE    = credentials('parakoopa-twine-username-password')
             }
             steps {
-                sh 'twine upload -u "$TWINE_USR" -p "$TWINE_PSW" dist/*'
+                sh 'twine upload -u "$TWINE_USR" -p "$TWINE_PSW" dist/*manylinux2014*'
             }
         }
 
