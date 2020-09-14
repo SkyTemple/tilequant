@@ -58,7 +58,7 @@ class BuildExt(build_ext):
         # Clone the repository - TODO: Switch to stable tar/zip download at some point.
         if not os.path.exists(path_repo):
             print("Cloning Aikku93's tilequant repository.")
-            repo = Repo.clone_from("https://github.com/SkyTemple/aikku93-tilequant.git", path_repo)
+            repo = Repo.clone_from("https://github.com/aikku93/tilequant.git", path_repo)
         # Run the build script
         exes = self.build(path_repo)
         if not exes:
@@ -93,7 +93,7 @@ class BuildExt(build_ext):
 
 setup(
     name='tilequant',
-    version='0.1.0.post1',
+    version='0.1.1',
     packages=find_packages(),
     description='Tool for quantizing image colors using tile-based palette restrictions',
     long_description=long_description,
