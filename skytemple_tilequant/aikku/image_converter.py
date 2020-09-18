@@ -15,14 +15,15 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with SkyTemple.  If not, see <https://www.gnu.org/licenses/>.
-import math
+
 import os
 import shutil
 import subprocess
 import sys
 import tempfile
-from itertools import chain
+from ctypes import cdll, c_int, POINTER, c_uint8, c_int32, memmove, byref
 from typing import List, Optional
+import platform
 
 from skytemple_tilequant.util import get_package_dir
 
@@ -33,9 +34,6 @@ except ImportError:
 
 from skytemple_tilequant import logger, Color
 from skytemple_tilequant.transparency_handler import TransparencyHandler
-
-
-TILE_WIDTH = TILE_HEIGHT = 8
 
 
 class TilequantError(RuntimeError):
@@ -55,22 +53,68 @@ class AikkuImageConverter:
     This is done using Aikku93's Tilequant.
     """
 
-    def __init__(self, img: Image.Image, transparent_color: Color=None):
+    def __init__(self, img: Image.Image, transparent_color: Color=None, tile_width=8, tile_height=8, dl_name=None):
         """
         Init.
         :param img:                 Input image. Is converted to RGB, alpha channel ist removed.
-        :param transparent_color:   A single color value that should be treated as transparent, when doing
+        :param transparent_color:   A single RGB color value that should be treated as transparent, when doing
                                     the conversion with transparency enabled.
+        :param tile_width:          Width of a tile
+        :param tile_height:          Height of a tile
+        :param dl_name:             Path to the DLL or SO file for Tilequant, if not given, will auto-detect.
         """
-        assert img.width % TILE_WIDTH == 0, f"The image width must be divisible by {TILE_WIDTH}"
-        assert img.height % TILE_HEIGHT == 0, f"The image height must be divisible by {TILE_HEIGHT}"
-        self._img = img.convert('RGB')
-        self._transparent_color = transparent_color
+        assert img.width % tile_width == 0, f"The image width must be divisible by {tile_width}"
+        assert img.height % tile_height == 0, f"The image height must be divisible by {tile_height}"
+        self._img = img.convert('RGBA').convert('RGBa')
+        self._transparent_color = None
+        if transparent_color is not None:
+            self._transparent_color = (transparent_color[0], transparent_color[1], transparent_color[2], 255)
+        self.tile_width = tile_width
+        self.tile_height = tile_height
         # The created image
         self._out_img: Optional[Image.Image] = None
-        self._fh = None
-        self._td = None
         self._reset(0, 0)
+
+        # Init the library
+        if dl_name is None:
+            # Try autodetect / CWD
+            try:
+                if platform.system().lower().startswith('windows'):
+                    dl_name = "libtilequant.dll"
+                    os.add_dll_directory(os.getcwd())
+                elif platform.system().lower().startswith('linux'):
+                    dl_name = "libtilequant.so"
+                elif platform.system().lower().startswith('darwin'):
+                    dl_name = "libtilequant.so"
+                else:
+                    RuntimeError(f"Unknown platform {platform.system()}, can't autodetect DLL to load.")
+
+                self.lib = cdll.LoadLibrary(dl_name)
+            except OSError:
+                # Okay now try the package directory
+                dl_name = os.path.dirname(os.path.realpath(__file__))
+                if platform.system().lower().startswith('windows'):
+                    os.add_dll_directory(dl_name)
+                    dl_name = os.path.join(dl_name, "libtilequant.dll")
+                elif platform.system().lower().startswith('linux'):
+                    dl_name = os.path.join(dl_name, "libtilequant.so")
+                elif platform.system().lower().startswith('darwin'):
+                    dl_name = os.path.join(dl_name, "libtilequant.so")
+
+                self.lib = cdll.LoadLibrary(dl_name)
+        else:
+            if platform.system().lower().startswith('windows'):
+                os.add_dll_directory(os.path.dirname(dl_name))
+                dl_name = os.path.basename(dl_name)
+
+            self.lib = cdll.LoadLibrary(dl_name)
+
+        self.lib.QualetizeFromRawImage.argtypes = (
+            c_int, c_int, POINTER(c_uint8), POINTER(c_uint8), POINTER(c_uint8), POINTER(c_uint8), c_int, c_int,
+            c_int, c_int, c_int, c_int, POINTER(c_int32), c_uint8 * 4
+        )
+        self.lib.QualetizeFromRawImage.restype = c_int
+
         logger.info("[%s] Initialized.", id(self))
 
     # noinspection PyAttributeOutsideInit
@@ -81,19 +125,6 @@ class AikkuImageConverter:
         self._num_palettes = num_palettes
         # Transparency handler object or None if transparency is disabled
         self._transparency = TransparencyHandler(self._transparent_color)
-        if self._fh is not None:
-            self._fh.close()
-        if self._td is not None:
-            shutil.rmtree(self._td)
-
-    def __del__(self):
-        if self._fh is not None:
-            self._fh.close()
-        try:
-            if self._td is not None:
-                shutil.rmtree(self._td)
-        except OSError:
-            pass
 
     def convert(self, num_palettes=16, colors_per_palette=16) -> Image.Image:
         """
@@ -115,84 +146,31 @@ class AikkuImageConverter:
                     id(self), self._num_palettes, self._colors_per_palette)
 
         # Collect transparent tiles
-        self._transparency.collect_and_remove_transparency(self._img)
+        self._transparency.collect_and_remove_transparency(self._img, True)
 
         # Execute Aikku's Tilequant
-        self._out_img = self._execute_tilequant(self._img, self._num_palettes, colors_per_palette)
-
-        # If transparency is enabled, update the palettes to include the transparent colors
-        # and reindex the colors, including replacing colors that were originally the transparent
-        # color with transparency.
-        original_palettes = self._extract_palette(colors_per_palette)
-        self._update_palette(
-            self._transparency.set_transparent_color_in_palettes(
-                original_palettes
-            )
-        )
-        self._transparency.update_pixels(
-            self._img.width,
-            int(self._img.width / TILE_WIDTH),
-            int(self._img.height / TILE_HEIGHT),
-            self._colors_per_palette,
-            TILE_WIDTH, TILE_HEIGHT,
-            image=self._out_img
-        )
+        self._out_img = self._execute_tilequant()
 
         # Iterate one last time and assign the final pixel colors and then build the image from it
         return self._out_img
 
-    def _execute_tilequant(self, orig_image: Image.Image, num_palettes, colors_per_palette) -> Image.Image:
-        try:
-            self._td = tmp = tempfile.mkdtemp(None, None, None)
-            # Convert input image to bmp
-            input_name = os.path.normpath(os.path.join(tmp, 'in.bmp'))
-            output_name = os.path.normpath(os.path.join(tmp, 'out.bmp'))
-            orig_image.save(input_name)
+    def _execute_tilequant(self) -> Image.Image:
+        dst_px_idx = (c_uint8 * (self._img.width * self._img.height))()
+        dst_pal = (c_uint8 * (self._num_palettes * self._colors_per_palette * 4 * 4))()
 
-            # Run Tilequant
-            try:
-                prefix = os.path.join(get_package_dir(), '')
-                if os.path.exists(f'{prefix}tilequant') and not sys.platform.startswith('win'):
-                    import stat
-                    st = os.stat(f'{prefix}tilequant')
-                    if not st.st_mode & stat.S_IEXEC:
-                        os.chmod(f'{prefix}tilequant', st.st_mode | stat.S_IEXEC)
-                result = subprocess.Popen([f'{prefix}tilequant', input_name, output_name,
-                                           str(num_palettes), str(colors_per_palette)],
-                                          stdout=subprocess.PIPE,
-                                          stderr=subprocess.STDOUT)
-                retcode = result.wait()
-            except FileNotFoundError as ex:
-                raise FileNotFoundError("Tilequant could not be found. Something may have gone "
-                                        "wrong during the installation.") from ex
+        img_data_bytes = self._img.tobytes('raw', 'BGRa')
+        img_data = (c_uint8 * len(img_data_bytes))()
+        memmove(byref(img_data), img_data_bytes, len(img_data_bytes))
 
-            if retcode != 0:
-                raise TilequantError("Aikku's Tilequant reported an error.",
-                                     str(result.stdout.read(), 'utf-8'), str(result.stderr.read(), 'utf-8') if result.stderr else '')
-            # Read output image
-            self._fh = open(output_name, 'rb')
-            return Image.open(self._fh)
-        except (FileNotFoundError, TilequantError):
-            raise
-        except BaseException as ex:
-            raise RuntimeError(f"Error while converting the colors: {ex}") from ex
+        self.lib.QualetizeFromRawImage(
+            self._img.width, self._img.height,
+            img_data, None, dst_px_idx, dst_pal, 1, True,
+            self._num_palettes, self._colors_per_palette,
+            self.tile_width, self.tile_height, None,
+            (c_uint8 * 4)(*[31, 31, 31, 1])
+        )
 
-    def _extract_palette(self, number_colors) -> List[List[Color]]:
-        pal = memoryview(self._out_img.palette.palette)
-        palettes: List[List[Color]] = []
-        cur_palette = []
-        for i in range(0, len(pal), 4):
-            if i % (number_colors * 4) == 0:
-                cur_palette = []
-                palettes.append(cur_palette)
-            cur_palette.append((pal[i + 2], pal[i + 1], pal[i + 0]))
-        return palettes
+        out = Image.frombuffer('P', (self._img.width, self._img.height), dst_px_idx, 'raw', 'P', 0, 1)
+        out.putpalette(dst_pal[:3 * 256])
 
-    def _update_palette(self, new_palette: List[List[Color]]):
-        out: List[int] = []
-        for p in new_palette:
-            for r, g, b in p:
-                out.append(r)
-                out.append(g)
-                out.append(b)
-        self._out_img.putpalette(out)
+        return out

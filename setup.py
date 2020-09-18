@@ -1,3 +1,5 @@
+import platform
+
 from setuptools import setup, find_packages
 
 from setuptools.command.build_ext import build_ext
@@ -70,7 +72,7 @@ class BuildExt(build_ext):
         # Copy the libraries to the correct place
         for exe in exes:
             build_target = os.path.join(
-                self.build_lib, 'skytemple_tilequant',
+                self.build_lib, 'skytemple_tilequant', 'aikku',
                 os.path.basename(exe)
             )
             print(f"Copying {exe} -> {build_target}")
@@ -79,12 +81,15 @@ class BuildExt(build_ext):
     def build(self, p):
         os.chdir(p)
         print(f"BUILDING - make")
-        retcode = subprocess.call("make", shell=True)
+        if platform.system() == "Windows":
+            retcode = subprocess.call("make dll", shell=True)
+        else:
+            retcode = subprocess.call("make dll DDECLSPEC=__declspec(dllexport)", shell=True)
         if retcode:
             return False
         exes = []
-        without_exe_path = os.path.abspath(os.path.join(p, 'release', 'tilequant'))
-        with_exe_path = os.path.abspath(os.path.join(p, 'release', 'tilequant.exe'))
+        without_exe_path = os.path.abspath(os.path.join(p, 'release', 'libtilequant.so'))
+        with_exe_path = os.path.abspath(os.path.join(p, 'release', 'libtilequant.dll'))
         if os.path.exists(without_exe_path):
             exes.append(without_exe_path)
         if os.path.exists(with_exe_path):
@@ -93,7 +98,7 @@ class BuildExt(build_ext):
 
 setup(
     name='tilequant',
-    version='0.1.1',
+    version='0.2.0',
     packages=find_packages(),
     description='Tool for quantizing image colors using tile-based palette restrictions',
     long_description=long_description,
@@ -105,7 +110,7 @@ setup(
         "sortedcollections>=1.1.0",
         "click>=7.0"
     ],
-    package_data={'skytemple_tilequant': ['tilequant*']},
+    package_data={'skytemple_tilequant.aikku': ['libtilequant*']},
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Programming Language :: Python',
