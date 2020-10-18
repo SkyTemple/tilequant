@@ -64,6 +64,8 @@ class ImageConverter:
         # Maximum number of palettes to generate
         self._num_palettes = num_palettes
         # How many colors to subtract with each attempt of quantization
+        # If it is -1, the tool will not try to subtract colors. It will just try one run with the maximum (or minimum,
+        # based on the setting of direction) amount of colors and throw an error if not possible.
         self._color_steps = color_steps
         # Which dithering algorithm to use
         self._dither = dither
@@ -98,7 +100,12 @@ class ImageConverter:
         :param num_palettes:            Number of palettes in the output
         :param colors_per_palette:      Number of colors per palette. If transparency is enabled, the first color in
                                         each palette is reserved for it.
-        :param color_steps:             Step interval for reducing the color count on conversion failures
+        :param color_steps:             Step interval for reducing the color count on conversion failures.
+                                        If it is -1, the tool will not try to subtract colors.
+                                        It will just try one run with the maximum (or minimum,
+                                        based on the setting of direction) amount of colors and throw an error if
+                                        not possible.
+                                        The original image will not be pre-processed if this is set to -1.
         :param max_colors:              Maximum overall colors to test, None means num_palettes*colors_per_palette
         :param low_to_high:             If True: Start with the lowest number of colors and go up until
                                         not possible anymore.
@@ -149,24 +156,29 @@ class ImageConverter:
 
         if self._transparency:
             # If transparency, collect transparent tiles
-            self._transparency.collect_and_remove_transparency(self._img)
+            self._transparency.collect_and_remove_transparency(
+                self._img, tile_w=self._tile_width, tile_h=self._tile_height
+            )
 
         if max_colors <= 1:
             raise ValueError("The requested palette specs don't contain any colors.")
 
         # First do a tiled quantize: Reduce the colors of all tiles to their best self._color_limit_per_tile colors.
         # This will hopefully lead to better results.
-        img = self._tiled_quantize(self._img.copy(), self._tile_width, self._tile_height, self._color_limit_per_tile)
-        # If mosaic limiting is enabled, also apply these rules to larger portions of the image, see docstring:
-        if mosaic_limiting:
-            block_width = self._tile_width * 2
-            block_height = self._tile_height * 2
-            block_colors = self._color_limit_per_tile * 2
-            while block_width < self._img.width and block_height < self._img.height and block_colors <= 256:
-                img = self._tiled_quantize(img, block_width, block_height, block_colors)
-                block_width *= 2
-                block_height *= 2
-                block_colors *= 2
+        if not self._color_steps == -1:
+            img = self._tiled_quantize(self._img.copy(), self._tile_width, self._tile_height, self._color_limit_per_tile)
+            # If mosaic limiting is enabled, also apply these rules to larger portions of the image, see docstring:
+            if mosaic_limiting:
+                block_width = self._tile_width * 2
+                block_height = self._tile_height * 2
+                block_colors = self._color_limit_per_tile * 2
+                while block_width < self._img.width and block_height < self._img.height and block_colors <= 256:
+                    img = self._tiled_quantize(img, block_width, block_height, block_colors)
+                    block_width *= 2
+                    block_height *= 2
+                    block_colors *= 2
+        else:
+            img = self._img.copy()
 
         # Prepare all full image color quantization
         prepare_color_count = max_colors
@@ -174,6 +186,8 @@ class ImageConverter:
         while prepare_color_count > 0:
             q_result = self._quantize(img, prepare_color_count)
             quant_images.append((prepare_color_count, q_result[0], q_result[1]))
+            if self._color_steps == -1:
+                break
             prepare_color_count -= self._color_steps
 
         # Go up instead flag set
@@ -190,7 +204,9 @@ class ImageConverter:
         last_working_run = None
         for color_count, quant_image, current_colors in quant_images:
             run = ConversionRun(color_count, quant_image, current_colors, self._tile_width,
-                                self._tile_height, self._num_palettes, colors_per_palette, id(self))
+                                self._tile_height, self._num_palettes, colors_per_palette, id(self),
+                                self._transparency.transparency_map
+                                )
             if not low_to_high:
                 # If big -> small:
                 # Go through the list and stop when first found
@@ -204,6 +220,8 @@ class ImageConverter:
                     break
                 else:
                     last_working_run = run
+            if self._color_steps == -1:
+                raise ValueError("Was unable to re-organize the colors in the image without removing colors.")
 
         if last_working_run is None:
             raise RuntimeError("Was unable to quantize image: Had no colors left.")
@@ -333,7 +351,12 @@ class ImageConverter:
                 for x in range(tx * self._tile_width, (tx + 1) * self._tile_width):
                     for y in range(ty * self._tile_height, (ty + 1) * self._tile_height):
                         col = run.colors[run.img.getpixel((x, y))]
-                        pxs[y * self._img.width + x] = index_first_col + run.palettes[palette_for_tile].index(col)
+                        try:
+                            col_val_index = index_first_col + run.palettes[palette_for_tile].index(col)
+                            pxs[y * self._img.width + x] = col_val_index
+                        except KeyError:
+                            # This can be none if the pixel was originally ignored, for transparency.
+                            pxs[y * self._img.width + x] = index_first_col
         return pxs
 
     def _build_image(self, indexed_pixels, palettes):

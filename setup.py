@@ -98,7 +98,7 @@ class BuildExt(build_ext):
 
 setup(
     name='tilequant',
-    version='0.2.1',
+    version='0.3.0',
     packages=find_packages(),
     description='Tool for quantizing image colors using tile-based palette restrictions',
     long_description=long_description,
@@ -107,7 +107,7 @@ setup(
     install_requires=[
         'Pillow >= 6.1.0',
         "ordered-set>=3.1.0",
-        "sortedcollections>=1.1.0",
+        "sortedcollections>=1.2.1",
         "click>=7.0"
     ],
     package_data={'skytemple_tilequant.aikku': ['libtilequant*']},

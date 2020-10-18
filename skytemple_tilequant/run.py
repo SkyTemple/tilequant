@@ -29,7 +29,7 @@ from skytemple_tilequant.palette_merger import PaletteMerger
 
 class ConversionRun:
     def __init__(self, color_count, img, colors, tile_width, tile_height, num_palettes, colors_per_palette, 
-                 conversion_id):
+                 conversion_id, pixels_to_ignore=None):
         self.color_count: int = color_count
         # Input image, quantized to max color_count
         self.img: Image.Image = img
@@ -52,6 +52,11 @@ class ConversionRun:
             (img.width * img.height) / (self._tile_width * self._tile_height)
         ))]
         self._deep_merge_check_needed_for_run = False
+        # These pixels will be ignored during conversion; use this for pixels that were originally transparent.
+        if not pixels_to_ignore:
+            self._pixels_to_ignore = [False] * len(img.getdata())
+        else:
+            self._pixels_to_ignore = pixels_to_ignore
         # The merger instance used for this run, use getter instead.
         self._merger = None
         self._id = conversion_id
@@ -100,10 +105,10 @@ class ConversionRun:
         # Collect all colors and try to fit them in palettes
         for y in range(ty * self._tile_height, (ty + 1) * self._tile_height):
             for x in range(tx * self._tile_width, (tx + 1) * self._tile_width):
-                # TODO: With transparency, make sure cc_idx is still correct!
                 cc_idx = self.img.getpixel((x, y))
                 cc = self.colors[cc_idx]
-                current_local_tile_palette.append(cc)
+                if not self._pixels_to_ignore[y * self.img.width + x]:
+                    current_local_tile_palette.append(cc)
 
         if len(current_local_tile_palette) > self._colors_per_palette:
             # We don't even have to continue... This single tile already has to many colors

@@ -22,6 +22,7 @@ import subprocess
 import sys
 import tempfile
 from ctypes import cdll, c_int, POINTER, c_uint8, c_int32, memmove, byref
+from enum import Enum, auto
 from typing import List, Optional
 import platform
 
@@ -44,6 +45,12 @@ class TilequantError(RuntimeError):
 
     def __str__(self):
         return self.message + '\n' + self.error_out + '\n' + self.error_err
+
+
+class DitheringMode(Enum):
+    NONE = 0
+    ORDERED = 3
+    FLOYDSTEINBERG = -1
 
 
 class AikkuImageConverter:
@@ -111,7 +118,7 @@ class AikkuImageConverter:
 
         self.lib.QualetizeFromRawImage.argtypes = (
             c_int, c_int, POINTER(c_uint8), POINTER(c_uint8), POINTER(c_uint8), POINTER(c_uint8), c_int, c_int,
-            c_int, c_int, c_int, c_int, POINTER(c_int32), c_uint8 * 4
+            c_int, c_int, c_int, c_int, POINTER(c_int32), c_uint8 * 4, c_int
         )
         self.lib.QualetizeFromRawImage.restype = c_int
 
@@ -126,7 +133,9 @@ class AikkuImageConverter:
         # Transparency handler object or None if transparency is disabled
         self._transparency = TransparencyHandler(self._transparent_color)
 
-    def convert(self, num_palettes=16, colors_per_palette=16) -> Image.Image:
+    def convert(
+            self, num_palettes=16, colors_per_palette=16, dithering_mode: DitheringMode = DitheringMode.ORDERED
+    ) -> Image.Image:
         """
         Perform the conversion, returns the converted indexed image.
 
@@ -136,6 +145,7 @@ class AikkuImageConverter:
         :param num_palettes:            Number of palettes in the output
         :param colors_per_palette:      Number of colors per palette. If transparency is enabled, the first color in
                                         each palette is reserved for it.
+        :param dithering_mode:          Dithering mode to use.
 
         :return: The converted image. It will contain a palette that consists of all generated sub-palettes, one
                  after the other.
@@ -149,12 +159,12 @@ class AikkuImageConverter:
         self._transparency.collect_and_remove_transparency(self._img, True)
 
         # Execute Aikku's Tilequant
-        self._out_img = self._execute_tilequant()
+        self._out_img = self._execute_tilequant(dithering_mode)
 
         # Iterate one last time and assign the final pixel colors and then build the image from it
         return self._out_img
 
-    def _execute_tilequant(self) -> Image.Image:
+    def _execute_tilequant(self, dithering_mode: DitheringMode) -> Image.Image:
         dst_px_idx = (c_uint8 * (self._img.width * self._img.height))()
         dst_pal = (c_uint8 * (self._num_palettes * self._colors_per_palette * 4 * 4))()
 
@@ -167,7 +177,7 @@ class AikkuImageConverter:
             img_data, None, dst_px_idx, dst_pal, 1, True,
             self._num_palettes, self._colors_per_palette,
             self.tile_width, self.tile_height, None,
-            (c_uint8 * 4)(*[31, 31, 31, 1])
+            (c_uint8 * 4)(*[31, 31, 31, 1]), dithering_mode.value
         )
 
         out = Image.frombuffer('P', (self._img.width, self._img.height), dst_px_idx, 'raw', 'P', 0, 1)

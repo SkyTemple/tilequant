@@ -30,17 +30,15 @@ class TransparencyHandler:
         self.transparent_color = transparent_color
         self.transparency_map = []
 
-    def collect_and_remove_transparency(self, img: Image.Image, replace_with_alpha=False):
+    def collect_and_remove_transparency(self, img: Image.Image, replace_with_alpha=False, tile_w=8, tile_h=8):
         """
         Get all pixels in img that match the transparent color. It must be a RGB/RGBA mode image (the transparent
         color set must match!).
-        The pixels are replaced with the last read non-transparent color, black if none was found.
         If replacd_with_alpha is True, the pixel will be replaced with one with alpha 0 (the input image MUST be
         RGBA then).
         """
         if self.transparent_color is None:
             return
-        last_color = (0, 0, 0)
         for i, px in enumerate(img.getdata()):
             y = math.floor(i / img.width)
             x = i % img.width
@@ -48,11 +46,8 @@ class TransparencyHandler:
                 self.transparency_map.append(True)
                 if replace_with_alpha:
                     img.putpixel((x, y), (0, 0, 0, 0))
-                else:
-                    img.putpixel((x, y), last_color)
             else:
                 self.transparency_map.append(False)
-                last_color = px
 
     def update_palettes(self, palettes: List[Union[None, Iterable]]) -> List[Union[None, OrderedSet]]:
         """
