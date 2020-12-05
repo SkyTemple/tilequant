@@ -1,3 +1,4 @@
+__version__ = '0.4.0'
 import platform
 
 from setuptools import setup, find_packages
@@ -98,7 +99,7 @@ class BuildExt(build_ext):
 
 setup(
     name='tilequant',
-    version='0.4.0',
+    version=__version__,
     packages=find_packages(),
     description='Tool for quantizing image colors using tile-based palette restrictions',
     long_description=long_description,
