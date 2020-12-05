@@ -3,8 +3,8 @@ tilequant
 
 |build| |pypi-version| |pypi-downloads| |pypi-license| |pypi-pyversions|
 
-.. |build| image:: https://jenkins.riptide.parakoopa.de/buildStatus/icon?job=tilequant%2Fmaster
-    :target: https://jenkins.riptide.parakoopa.de/blue/organizations/jenkins/tilequant/activity
+.. |build| image:: https://img.shields.io/github/workflow/status/SkyTemple/tilequant/Build,%20test%20and%20publish
+    :target: https://pypi.org/project/tilequant/
     :alt: Build Status
 
 .. |pypi-version| image:: https://img.shields.io/pypi/v/tilequant
