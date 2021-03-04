@@ -83,9 +83,9 @@ class BuildExt(build_ext):
         os.chdir(p)
         print(f"BUILDING - make")
         if platform.system() != "Windows":
-            retcode = subprocess.call("make dll", shell=True)
+            retcode = subprocess.call(["make", "dll"])
         else:
-            retcode = subprocess.call("make dll DDECLSPEC=__declspec(dllexport)", shell=True)
+            retcode = subprocess.call(["make", "dll", "DDECLSPEC=__declspec(dllexport)"])
         if retcode:
             return False
         exes = []
