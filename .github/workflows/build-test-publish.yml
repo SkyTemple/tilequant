@@ -83,8 +83,8 @@ jobs:
       fail-fast: false
       matrix:
         include: [
-          { msystem: MINGW64, arch: x86_64 },
-          { msystem: MINGW32, arch: i686 }
+          { msystem: MINGW64, arch: x86_64, path: mingw64 },
+          { msystem: MINGW32, arch: i686, path: mingw32 }
         ]
     steps:
       - name: Install MSys2 and dependencies
@@ -116,6 +116,11 @@ jobs:
         shell: msys2 {0}
         run: |
           python -m pip install --upgrade pip GitPython wheel
+      - name: Fix Path
+        shell: msys2 {0}
+        run: |
+          ls /${{ matrix.path }}/bin
+          ln -s /${{ matrix.path }}/bin/mingw*-make.exe /${{ matrix.path }}/bin/make.exe
       - name: Build Python wheels
         shell: msys2 {0}
         run: |
@@ -148,5 +153,4 @@ jobs:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
-          twine upload *.whl
-        # TODO: Exclude Mingw
+          twine upload *linux*.whl *win*.whl *macosx*.whl
