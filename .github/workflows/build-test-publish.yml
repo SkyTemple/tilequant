@@ -153,4 +153,4 @@ jobs:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
-          twine upload *linux*.whl *win*.whl *macosx*.whl
+          twine upload *manylinux*.whl *win*.whl *macosx*.whl
