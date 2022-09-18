@@ -12,6 +12,8 @@ jobs:
       # For tags we assume the version in setup.py is correct!
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
       - name: Rewrite version for dev if not tag
         if: "!startsWith(github.ref, 'refs/tags/')"
         run: |
@@ -30,7 +32,6 @@ jobs:
         uses: RalfG/python-wheels-manylinux-build@v0.3.3-manylinux2014_x86_64
         with:
           python-versions: 'cp36-cp36m cp37-cp37m cp38-cp38 cp39-cp39'
-          build-requirements: 'GitPython'
       - name: Upload wheels
         uses: actions/upload-artifact@v2
         with:
@@ -42,15 +43,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ macos-10.15, windows-2019 ]
+        os: [ macos-11, windows-2019 ]
         python-version: [ '3.7', '3.8', '3.9', '3.10' ]
         arch: [ 'x64', 'x86' ]
         exclude:
-          - os: macos-10.15
+          - os: macos-11
             arch: 'x86'
     steps:
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
       - name: Rewrite version for dev if not tag
         if: "!startsWith(github.ref, 'refs/tags/')"
         shell: bash
@@ -65,9 +68,9 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           architecture: ${{ matrix.arch }}
-      - name: Upgrade pip, install GitPython
+      - name: Upgrade pip
         run: |
-          python -m pip install --upgrade pip GitPython wheel
+          python -m pip install --upgrade pip wheel
       - name: Build Python wheels
         run: |
           python setup.py bdist_wheel
@@ -103,6 +106,8 @@ jobs:
             mingw-w64-${{ matrix.arch }}-toolchain
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          submodules: 'recursive'
       - name: Rewrite version for dev if not tag
         if: "!startsWith(github.ref, 'refs/tags/')"
         shell: msys2 {0}
@@ -112,10 +117,10 @@ jobs:
         shell: msys2 {0}
         run: |
           echo "PACKAGE_VERSION=$(python3 -- ./setup.py --version)" >> $GITHUB_ENV
-      - name: Upgrade pip, install GitPython
+      - name: Upgrade pip
         shell: msys2 {0}
         run: |
-          python -m pip install --upgrade pip GitPython wheel
+          python -m pip install --upgrade pip wheel
       - name: Fix Path
         shell: msys2 {0}
         run: |

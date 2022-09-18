@@ -1,4 +1,4 @@
-__version__ = '0.4.0.post0'
+__version__ = '0.4.1'
 import platform
 
 from setuptools import setup, find_packages
@@ -53,15 +53,9 @@ class BuildExt(build_ext):
         global is_installed_develop
         if is_installed_develop:
             return
-        from git import Repo
 
         this_path = os.getcwd()
-        path_repo = os.path.join(this_path, '__aikku93_tilequant')
-
-        # Clone the repository - TODO: Switch to stable tar/zip download at some point.
-        if not os.path.exists(path_repo):
-            print("Cloning Aikku93's tilequant repository.")
-            repo = Repo.clone_from("https://github.com/SkyTemple/aikku93-tilequant.git", path_repo)
+        path_repo = os.path.join(this_path, 'aikku93-tilequant')
         # Run the build script
         exes = self.build(path_repo)
         if not exes:

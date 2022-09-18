@@ -1,0 +1,3 @@
+[submodule "aikku93-tilequant"]
+	path = aikku93-tilequant
+	url = https://github.com/SkyTemple/aikku93-tilequant.git
