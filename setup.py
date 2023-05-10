@@ -1,4 +1,4 @@
-__version__ = '0.4.1.post0'
+__version__ = '0.4.1.post1'
 import platform
 
 from setuptools import setup, find_packages
