@@ -30,14 +30,13 @@ jobs:
         with:
           name: wheels-linux
           path: dist/*.whl
-  # TODO: For now we just build macOS.
   build_macos_windows:
     runs-on: ${{ matrix.os }}
     name: Mac/Win Wheel
     strategy:
       fail-fast: false
       matrix:
-        os: [ macos-11 ] #, windows-2019 ]
+        os: [ macos-11, windows-2019 ]
         python-version: [ '3.7', '3.8', '3.9', '3.10', '3.11' ]
         arch: [ 'x64', 'x86' ]
         exclude:
@@ -152,4 +151,4 @@ jobs:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
-          twine upload wheels-linux/*manylinux*.whl wheels-macos*/*.whl
+          twine upload wheels-linux/*manylinux*.whl wheels-macos*/*.whl wheels-windows*/*.whl
