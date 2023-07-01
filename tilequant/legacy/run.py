@@ -1,3 +1,4 @@
+# type: ignore
 """A single run of image conversion"""
 #  Copyright 2020-2021 Parakoopa and the SkyTemple Contributors
 #
@@ -23,13 +24,23 @@ except ImportError:
     from pil import Image
 from ordered_set import OrderedSet
 
-from skytemple_tilequant import Color, logger
-from skytemple_tilequant.palette_merger import PaletteMerger
+from tilequant.util import Color
+from tilequant.legacy.palette_merger import PaletteMerger
 
 
 class ConversionRun:
-    def __init__(self, color_count, img, colors, tile_width, tile_height, num_palettes, colors_per_palette, 
-                 conversion_id, pixels_to_ignore=None):
+    def __init__(
+        self,
+        color_count,
+        img,
+        colors,
+        tile_width,
+        tile_height,
+        num_palettes,
+        colors_per_palette,
+        conversion_id,
+        pixels_to_ignore=None,
+    ):
         self.color_count: int = color_count
         # Input image, quantized to max color_count
         self.img: Image.Image = img
@@ -48,9 +59,13 @@ class ConversionRun:
         self.palettes = []
         # A list where each entry is one image tile and the values are lists of possible indices from self.palettes,
         # that the tile could use
-        self.palettes_for_tiles = [[] for _ in range(0, int(
-            (img.width * img.height) / (self._tile_width * self._tile_height)
-        ))]
+        self.palettes_for_tiles = [
+            []
+            for _ in range(
+                0,
+                int((img.width * img.height) / (self._tile_width * self._tile_height)),
+            )
+        ]
         self._deep_merge_check_needed_for_run = False
         # These pixels will be ignored during conversion; use this for pixels that were originally transparent.
         if not pixels_to_ignore:
@@ -65,9 +80,7 @@ class ConversionRun:
     def merger(self) -> PaletteMerger:
         if not self._merger:
             self._merger = PaletteMerger(
-                self.palettes.copy(),
-                self._num_palettes,
-                self._colors_per_palette
+                self.palettes.copy(), self._num_palettes, self._colors_per_palette
             )
         return self._merger
 
@@ -87,9 +100,6 @@ class ConversionRun:
         palettes that could be merged.
         """
 
-        logger.info("[%s] Trying to fit palettes with %d total colors.",
-                    self._id, self.color_count)
-
         # Iterate tiles:
         for ty in self._iterate_tiles_y():
             for tx in self._iterate_tiles_x():
@@ -100,7 +110,6 @@ class ConversionRun:
 
     def _index_tile(self, tx, ty):
         current_local_tile_palette = OrderedSet()
-        logger.debug("[%s] Processing tile %d x %d", self._id, tx, ty)
 
         # Collect all colors and try to fit them in palettes
         for y in range(ty * self._tile_height, (ty + 1) * self._tile_height):
@@ -112,19 +121,15 @@ class ConversionRun:
 
         if len(current_local_tile_palette) > self._colors_per_palette:
             # We don't even have to continue... This single tile already has to many colors
-            logger.info("[%s] Tile %d x %d contains to many colors, aborting...", self._id, tx, ty)
             return False
 
         # Get possible palettes of the tile
-        possible_palettes = self._get_suitable_palettes(
-            current_local_tile_palette
-        )
+        possible_palettes = self._get_suitable_palettes(current_local_tile_palette)
         if len(possible_palettes) < 1:
             # No palette contains all colors... We need to create a new one
             possible_palettes = [len(self.palettes)]
             self.palettes.append(OrderedSet(current_local_tile_palette))
 
-        logger.debug("[%s] Tile %d x %d can use palettes %s", self._id, tx, ty, possible_palettes)
         self.palettes_for_tiles[self._tile_coord(tx, ty)] = possible_palettes
         return True
 
@@ -137,9 +142,7 @@ class ConversionRun:
     def _tile_coord(self, tx, ty):
         return int(self.img.width / self._tile_width) * ty + tx
 
-    def _get_suitable_palettes(
-            self, tile_pal: OrderedSet
-    ) -> List[int]:
+    def _get_suitable_palettes(self, tile_pal: OrderedSet) -> List[int]:
         """
         Check which palettes contain all colors of tile_pal.
         If tile_pal is instead a superset of any of the palettes, those palettes are updated with the colors
@@ -162,23 +165,21 @@ class ConversionRun:
         """
 
         palette_color_counts = [len(p) for p in self.palettes]
-        logger.debug("[%s] Updating pal list... Currently have palettes with col counts: %s",
-                     self._id, palette_color_counts)
 
         if not self._deep_merge_check_needed_for_run:
-
             # Easy case: We still have open slots
             if len(self.palettes) < self._num_palettes:
                 return True
 
             # Slightly harder case:
             # Try and see if we could still easily merge to get under self._num_palettes
-            if PaletteMerger.try_fast_merge(self.palettes.copy(), self._colors_per_palette, self._num_palettes):
+            if PaletteMerger.try_fast_merge(
+                self.palettes.copy(), self._colors_per_palette, self._num_palettes
+            ):
                 return True
 
         self._deep_merge_check_needed_for_run = True
 
         # Hardest case:
         # Try to find a way to merge by actually trying to find a merge path
-        logger.debug("[%s] Have to do full merge find for palettes, please stand by...", self._id)
         return self.merger.try_to_merge()

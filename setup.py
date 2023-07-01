@@ -67,7 +67,7 @@ class BuildExt(build_ext):
         # Copy the libraries to the correct place
         for exe in exes:
             build_target = os.path.join(
-                self.build_lib, 'skytemple_tilequant', 'aikku',
+                self.build_lib, 'skytemple_tilequant',
                 os.path.basename(exe)
             )
             print(f"Copying {exe} -> {build_target}")
@@ -102,10 +102,9 @@ setup(
     install_requires=[
         'Pillow >= 6.1.0',
         "ordered-set>=3.1.0",
-        "sortedcollections>=1.2.1",
         "click>=7.0"
     ],
-    package_data={'skytemple_tilequant.aikku': ['libtilequant*']},
+    package_data={'skytemple_tilequant': ['libtilequant*']},
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Programming Language :: Python',
@@ -120,8 +119,7 @@ setup(
     ],
     entry_points='''
         [console_scripts]
-        tilequant=skytemple_tilequant.aikku.cli:main
-        tilequant_legacy=skytemple_tilequant.cli_legacy:main
+        tilequant=skytemple_tilequant.cli:main
     ''',
     distclass=BinaryDistribution,
     cmdclass={'build_ext': BuildExt, 'install': InstallPlatlib, 'develop': Develop}

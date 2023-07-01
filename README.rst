@@ -3,7 +3,7 @@ tilequant
 
 |build| |pypi-version| |pypi-downloads| |pypi-license| |pypi-pyversions|
 
-.. |build| image:: https://img.shields.io/github/workflow/status/SkyTemple/tilequant/Build,%20test%20and%20publish
+.. |build| image:: https://img.shields.io/github/actions/workflow/status/SkyTemple/tilequant/build-test-publish.yml
     :target: https://pypi.org/project/tilequant/
     :alt: Build Status
 
@@ -41,7 +41,7 @@ The output is an image with a palettes as shown in the example.
 
 .. image:: https://github.com/SkyTemple/tilequant/raw/master/examples/export_example2.png
 
-(This example is based on the old legacy version).
+(This example is based on an old legacy version).
 
 This tool is not affiliated with Nintendo, Spike Chunsoft or any of the parties involved in
 creating Pokémon Mystery Dungeon Explorers of Sky. This is a fan-project.
@@ -102,15 +102,13 @@ Legacy version
 --------------
 Originally (before integrating the new and much better newer version based on
 `Tilequant by Aikku93`_) there was a pretty bad pure-Python
-based version of this tool. It is still available and it's README can be found in the
-``README_LEGAXY.rst``.
+based version of this tool. It is no longer available in current versions of this lib, to
+access it see versions prior to 1.x.
+
+The only thing left over from the legacy implementation is `Tilequant.simple_convert` (only accessible via API)
+which allows trying to convert images without running any sort of quantization on them, failing if not possible.
 
 .. _Tilequant by Aikku93: https://github.com/Aikku93/tilequant
-
-Package structure
------------------
-The ``skytemple_tilequant`` package contains the code for the legacy version and the
-``skytemple_tilequant.aikku`` package contains the new one.
 
 Special Thanks
 --------------

@@ -1,4 +1,4 @@
-#  Copyright 2020-2021 Parakoopa and the SkyTemple Contributors
+#  Copyright 2020-2023 Capypara and the SkyTemple Contributors
 #
 #  This file is part of SkyTemple.
 #
@@ -14,38 +14,63 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with SkyTemple.  If not, see <https://www.gnu.org/licenses/>.
-import logging
 import os
 
 import click
 
-from skytemple_tilequant.aikku.image_converter import AikkuImageConverter
-from skytemple_tilequant.util import convert_hex_str_color_to_tuple
+from tilequant.image_converter import Tilequant
+from tilequant.util import convert_hex_str_color_to_tuple
 
 try:
     from PIL import Image
 except ImportError:
-    from pil import Image
+    from pil import Image  # type: ignore
 from click import echo, ClickException
-
-from skytemple_tilequant import logger
 
 
 @click.command()
-@click.argument('input_image', required=True)
-@click.argument('output_image', required=True)
-@click.option('-n', '--num-palettes', required=False, type=int, default=16,
-              help="[Default: 16] Number of palettes in the output.")
-@click.option('-c', '--colors-per-palette', required=False, type=int, default=16,
-              help="[Default: 16] Number of colors per palette. If transparency is enabled, the first color in each "
-                   "palette is reserved for it.")
-@click.option('-t', '--transparent-color', type=str, required=False,
-              help="A single color value (hex style, eg. 12ab56) that should be treated as transparent, when doing"
-                   "the conversion with transparency enabled.")
-@click.option('-v', '--loglevel', type=click.Choice(['DEBUG', 'INFO', 'WARNING', 'ERROR', 'FATAL', 'CRITICAL']),
-              default='INFO',
-              help="[Default: INFO] Log level.")
-def main(input_image, output_image, loglevel, num_palettes, colors_per_palette, transparent_color):
+@click.argument("input_image", required=True)
+@click.argument("output_image", required=True)
+@click.option(
+    "-n",
+    "--num-palettes",
+    required=False,
+    type=int,
+    default=16,
+    help="[Default: 16] Number of palettes in the output.",
+)
+@click.option(
+    "-c",
+    "--colors-per-palette",
+    required=False,
+    type=int,
+    default=16,
+    help="[Default: 16] Number of colors per palette. If transparency is enabled, the first color in each "
+    "palette is reserved for it.",
+)
+@click.option(
+    "-t",
+    "--transparent-color",
+    type=str,
+    required=False,
+    help="A single color value (hex style, eg. 12ab56) that should be treated as transparent, when doing"
+    "the conversion with transparency enabled.",
+)
+@click.option(
+    "-v",
+    "--loglevel",
+    type=click.Choice(["DEBUG", "INFO", "WARNING", "ERROR", "FATAL", "CRITICAL"]),
+    default="INFO",
+    help="[Default: INFO] Log level.",
+)
+def main(
+    input_image,
+    output_image,
+    loglevel,
+    num_palettes,
+    colors_per_palette,
+    transparent_color,
+):
     """
     Converts any image into a indexed image containing a number of smaller sub-palettes (--num-palettes), each with a
     fixed color length (--colors-per-palette). The conversion will assign each tile in the image one of
@@ -55,17 +80,18 @@ def main(input_image, output_image, loglevel, num_palettes, colors_per_palette, 
     types supported by PIL (the Python image library) can be used.
     :return:
     """
-    logger.setLevel(logging.getLevelName(loglevel))
     echo("Converting...")
     if not os.path.exists(input_image):
         raise ClickException("The input image doesn't exist.")
-    with open(input_image, 'rb') as input_file:
+    with open(input_image, "rb") as input_file:
         try:
             image = Image.open(input_file)
         except OSError:
             raise ClickException("The input image is not a supported image file.")
         try:
-            converter = AikkuImageConverter(image, convert_hex_str_color_to_tuple(transparent_color))
+            converter = Tilequant(
+                image, convert_hex_str_color_to_tuple(transparent_color)
+            )
             img = converter.convert(num_palettes, colors_per_palette)
         except RuntimeError as err:
             raise ClickException("The image could not be converted: " + str(err))
@@ -76,5 +102,5 @@ def main(input_image, output_image, loglevel, num_palettes, colors_per_palette, 
         raise ClickException("Error saving the image: " + str(err))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -1,4 +1,4 @@
-#  Copyright 2020-2021 Parakoopa and the SkyTemple Contributors
+#  Copyright 2020-2023 Capypara and the SkyTemple Contributors
 #
 #  This file is part of SkyTemple.
 #
@@ -16,14 +16,16 @@
 #  along with SkyTemple.  If not, see <https://www.gnu.org/licenses/>.
 import os
 
-from skytemple_tilequant import Color
+from typing import Tuple
+
+Color = Tuple[int, int, int]
 
 
 # noinspection PyTypeChecker
 def convert_hex_str_color_to_tuple(h: str) -> Color:
     if h is None:
         return None
-    return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+    return tuple(int(h[i : i + 2], 16) for i in (0, 2, 4))  # type: ignore
 
 
 def get_package_dir():

@@ -1,4 +1,4 @@
-#  Copyright 2020-2021 Parakoopa and the SkyTemple Contributors
+#  Copyright 2020-2023 Capypara and the SkyTemple Contributors
 #
 #  This file is part of SkyTemple.
 #
@@ -14,9 +14,6 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with SkyTemple.  If not, see <https://www.gnu.org/licenses/>.
-import logging
-from typing import Tuple
+from tilequant.image_converter import Tilequant, DitheringMode
 
-logging.basicConfig()
-logger = logging.getLogger('skytemple_tilequant')
-Color = Tuple[int, int, int]
+__all__ = ["Tilequant", "DitheringMode"]

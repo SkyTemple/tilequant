@@ -1,3 +1,4 @@
+# type: ignore
 #  Copyright 2020-2021 Parakoopa and the SkyTemple Contributors
 #
 #  This file is part of SkyTemple.
@@ -26,8 +27,10 @@ class PaletteMerger:
     Class to merge palettes, provides a fast check as class method and a slower check with a higher successrate
     via try_to_merge.
     """
-    def __init__(self, palettes: List[OrderedSet],
-                 num_palettes: int, colors_per_palette: int):
+
+    def __init__(
+        self, palettes: List[OrderedSet], num_palettes: int, colors_per_palette: int
+    ):
         """
         :param palettes: A list of ordered sets of palettes
         :param palette_relations: A list of lists of possible palettes for tiles
@@ -60,7 +63,9 @@ class PaletteMerger:
                     remove_this_run_indices.append(i)
                     len_this_run += len(p)
 
-            palettes = [p for i, p in enumerate(palettes) if i not in remove_this_run_indices]
+            palettes = [
+                p for i, p in enumerate(palettes) if i not in remove_this_run_indices
+            ]
             full_palettes += 1
 
         return full_palettes < num_palettes
@@ -88,9 +93,16 @@ class PaletteMerger:
 
         # TODO: Creating and iterating a list of all combinations over and over
         #       takes VERY long if no match can be found.
-        max_combinations = list(itertools.combinations([
-            pal_idx for pal_idx, c in self._count_per_pal.items() if c <= self._colors_per_palette
-        ], 2))
+        max_combinations = list(
+            itertools.combinations(
+                [
+                    pal_idx
+                    for pal_idx, c in self._count_per_pal.items()
+                    if c <= self._colors_per_palette
+                ],
+                2,
+            )
+        )
 
         # Find first combination that can be merged
         for i, pal_pair in enumerate(max_combinations):
