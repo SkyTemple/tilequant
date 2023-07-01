@@ -32,8 +32,8 @@ jobs:
           python-version: "3.11"
       - uses: psf/black@stable
         with:
-          options: "--check -t py38 --extend-exclude _resources/pmdsky-debug"
-          src: "skytemple_files"
+          options: "--check -t py38"
+          src: tilequant
 
   import-check:
     runs-on: ubuntu-latest
@@ -52,7 +52,7 @@ jobs:
         pip install pycln
         pip install -e .
     - name: Analysing the code with pycln
-      run: pycln skytemple_files -c -a
+      run: pycln tilequant -c -a
 
   build_linux:
     runs-on: ubuntu-latest
@@ -100,7 +100,7 @@ jobs:
         if: "!startsWith(github.ref, 'refs/tags/')"
         shell: bash
         run: |
-          perl -i -pe "s/__version__\s*=\s*'(.*?)(\.rc.*|\.a.*|\.post.*)?'/__version__='\1.dev0+${GITHUB_SHA::8}'/" setup.py
+          perl -i -pe "s/version\s*=\s*'(.*?)(\.rc.*|\.a.*|\.post.*)?'/version='\1.dev0+${GITHUB_SHA::8}'/" setup.py
       - name: Note version
         shell: bash
         run: |
@@ -113,11 +113,6 @@ jobs:
       - name: Upgrade pip
         run: |
           python -m pip install --upgrade pip wheel
-      - name: Set up MinGW
-        if: ${{ matrix.os == 'windows-2019' }}
-        uses: egor-tensin/setup-mingw@v2
-        with:
-          platform: x64
       - name: Build Python wheels
         run: |
           python setup.py bdist_wheel
@@ -125,62 +120,6 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: wheels-${{ matrix.os }}-py${{ matrix.python-version }}-${{ matrix.arch }}
-          path: dist/*.whl
-  build_mingw:
-    runs-on: windows-2019
-    name: Msys Wheel
-    strategy:
-      fail-fast: false
-      matrix:
-        include: [
-          { msystem: MINGW64, arch: x86_64, path: mingw64 },
-          { msystem: MINGW32, arch: i686, path: mingw32 }
-        ]
-    steps:
-      - name: Install MSys2 and dependencies
-        uses: msys2/setup-msys2@v2
-        with:
-          update: true
-          msystem: ${{ matrix.msystem }}
-          install: >-
-            git
-            unzip
-            mingw-w64-${{ matrix.arch }}-curl
-            mingw-w64-${{ matrix.arch }}-python
-            mingw-w64-${{ matrix.arch }}-python-pip
-            mingw-w64-${{ matrix.arch }}-python-pillow
-            mingw-w64-${{ matrix.arch }}-openssl
-            mingw-w64-${{ matrix.arch }}-toolchain
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          submodules: 'recursive'
-      - name: Rewrite version for dev if not tag
-        if: "!startsWith(github.ref, 'refs/tags/')"
-        shell: msys2 {0}
-        run: |
-          perl -i -pe "s/__version__\s*=\s*'(.*?)(\.rc.*|\.a.*|\.post.*)?'/__version__='\1.dev0+${GITHUB_SHA::8}'/" setup.py
-      - name: Note version
-        shell: msys2 {0}
-        run: |
-          echo "PACKAGE_VERSION=$(python3 -- ./setup.py --version)" >> $GITHUB_ENV
-      - name: Upgrade pip
-        shell: msys2 {0}
-        run: |
-          python -m pip install --upgrade pip wheel
-      - name: Fix Path
-        shell: msys2 {0}
-        run: |
-          ls /${{ matrix.path }}/bin
-          ln -s /${{ matrix.path }}/bin/mingw*-make.exe /${{ matrix.path }}/bin/make.exe
-      - name: Build Python wheels
-        shell: msys2 {0}
-        run: |
-          python setup.py bdist_wheel
-      - name: Upload wheels
-        uses: actions/upload-artifact@v3
-        with:
-          name: wheels-msys2-py-${{ matrix.msystem }}
           path: dist/*.whl
   deploy:
     if: startsWith(github.ref, 'refs/tags/')
