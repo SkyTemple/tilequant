@@ -110,5 +110,4 @@ venv.bak/
 ### skytemple
 dbg_output
 __aikku93_tilequant/
-skytemple_tilequant/tilequant.exe
-skytemple_tilequant/tilequant
+tilequant_dsoinfo.py
