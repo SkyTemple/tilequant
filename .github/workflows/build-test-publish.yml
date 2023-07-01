@@ -14,10 +14,13 @@ jobs:
         python-version: [ "3.8", "3.9", "3.10", "3.11" ]
     steps:
     - uses: actions/checkout@v3
+      with:
+        submodules: 'recursive'
     - uses: theCapypara/mypy-check@rust-support
       name: Run type checks
       with:
         python_version: '${{ matrix.python-version }}'
+        requirements: '-r mypy-requirements.txt'
 
   code-formatting:
     runs-on: ubuntu-latest
