@@ -105,7 +105,7 @@ Originally (before integrating the new and much better newer version based on
 based version of this tool. It is no longer available in current versions of this lib, to
 access it see versions prior to 1.x.
 
-The only thing left over from the legacy implementation is `Tilequant.simple_convert` (only accessible via API)
+The only thing left over from the legacy implementation is ``Tilequant.simple_convert`` (only accessible via API)
 which allows trying to convert images without running any sort of quantization on them, failing if not possible.
 
 .. _Tilequant by Aikku93: https://github.com/Aikku93/tilequant
