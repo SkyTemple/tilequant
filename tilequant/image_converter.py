@@ -137,22 +137,24 @@ class Tilequant:
             self.lib = cdll.LoadLibrary(dl_name)
 
         self.lib.QualetizeFromRawImage.argtypes = (
-            c_int,
-            c_int,
-            POINTER(c_uint8),
-            POINTER(c_uint8),
-            POINTER(c_uint8),
-            POINTER(c_uint8),
-            c_int,
-            c_int,
-            c_int,
-            c_int,
-            c_int,
-            c_int,
-            POINTER(c_int32),
-            c_uint8 * 4,
-            c_int,
-            c_float,
+            c_int,  # int ImgWidth,
+            c_int,  # int ImgHeight,
+            POINTER(c_uint8),  # const uint8_t *SrcPxData,
+            POINTER(c_uint8),  # const uint8_t *SrcPxPal,
+            POINTER(c_uint8),  # uint8_t *DstPxIdx,
+            POINTER(c_uint8),  # uint8_t *DstPal,
+            c_int,  # int nUnusedColoursPerPalette,
+            c_int,  # int OutputPaletteIs24bitRGB,
+            c_int,  # int nPalettes,
+            c_int,  # int nColoursPerPalette,
+            c_int,  # int TileW,
+            c_int,  # int TileH,
+            POINTER(c_int32),  # int32_t *TilePalIdx,
+            c_int,  # int nTileClusterPasses,
+            c_int,  # int nColourClusterPasses,
+            c_uint8 * 4,  # const uint8_t BitRange[4],
+            c_int,  # int DitherMode,
+            c_float,  # float DitherLevel
         )
         self.lib.QualetizeFromRawImage.restype = c_int
 
@@ -187,6 +189,8 @@ class Tilequant:
         colors_per_palette=16,
         dithering_mode: DitheringMode = DitheringMode.ORDERED,
         dithering_level=1.0,
+        num_tile_cluster_passes=0,
+        num_color_cluster_passes=0,
     ) -> Image.Image:
         """
         Perform the conversion, returns the converted indexed image.
@@ -194,11 +198,15 @@ class Tilequant:
         It's highly recommended you pre-quantize the input image (=reduce the colors), because PIL (the used
         library) isn't very good at it. Use num_palettes*colors_per_palette colors for this.
 
-        :param num_palettes:            Number of palettes in the output
-        :param colors_per_palette:      Number of colors per palette. If transparency is enabled, the first color in
-                                        each palette is reserved for it.
-        :param dithering_mode:          Dithering mode to use.
-        :param dithering_level:         Scale of the dither (0.0 = No dither, 1.0 = Full dither).
+        :param num_palettes:                Number of palettes in the output
+        :param colors_per_palette:          Number of colors per palette. If transparency is enabled, the first color in
+                                            each palette is reserved for it.
+        :param dithering_mode:              Dithering mode to use.
+        :param dithering_level:             Scale of the dither (0.0 = No dither, 1.0 = Full dither).
+        :param num_tile_cluster_passes:     Manually control the number of tile clustering passes,
+                                            0 uses reasonable defaults.
+        :param num_color_cluster_passes:    Manually control the number of color clustering passes,
+                                            0 uses reasonable defaults.
 
         :return: The converted image. It will contain a palette that consists of all generated sub-palettes, one
                  after the other.
@@ -209,7 +217,12 @@ class Tilequant:
 
         # Execute Aikku's Tilequant
         self._out_img = self._execute_tilequant(
-            num_palettes, colors_per_palette, dithering_mode, dithering_level
+            num_palettes,
+            colors_per_palette,
+            dithering_mode,
+            dithering_level,
+            num_tile_cluster_passes,
+            num_color_cluster_passes,
         )
 
         # Iterate one last time and assign the final pixel colors and then build the image from it
@@ -221,6 +234,8 @@ class Tilequant:
         colors_per_palette: int,
         dithering_mode: DitheringMode,
         dithering_level: float,
+        num_tile_cluster_passes: int,
+        num_color_cluster_passes: int,
     ) -> Image.Image:
         dst_px_idx = (c_uint8 * (self._img.width * self._img.height))()
         dst_pal = (c_uint8 * (num_palettes * colors_per_palette * 4 * 4))()
@@ -243,6 +258,8 @@ class Tilequant:
             self.tile_width,
             self.tile_height,
             None,
+            num_tile_cluster_passes,
+            num_color_cluster_passes,
             (c_uint8 * 4)(*[31, 31, 31, 1]),
             dithering_mode.value,
             dithering_level,

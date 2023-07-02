@@ -21,6 +21,7 @@ def define_DSOs(cmd):
     dso = DSO('tilequant', [
             'aikku93-tilequant/Bitmap.c',
             'aikku93-tilequant/Quantize.c',
+            'aikku93-tilequant/Dither.c',
             'aikku93-tilequant/Qualetize.c',
             'aikku93-tilequant/Tiles.c',
             'aikku93-tilequant/tilequantDLL.c',
