@@ -13,7 +13,7 @@ jobs:
       matrix:
         python-version: [ "3.8", "3.9", "3.10", "3.11" ]
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         submodules: 'recursive'
     - uses: theCapypara/mypy-check@rust-support
@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Code Format Check
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: 'recursive'
       - name: Set up Python 3.11
@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     name: Check unused imports
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
       with:
         submodules: 'recursive'
     - name: Set up Python 3.11
@@ -63,7 +63,7 @@ jobs:
     steps:
       # For tags we assume the version in setup.py is correct!
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: 'recursive'
       - name: Rewrite version for dev if not tag
@@ -96,7 +96,7 @@ jobs:
             arch: 'x86'
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           submodules: 'recursive'
       - name: Rewrite version for dev if not tag
