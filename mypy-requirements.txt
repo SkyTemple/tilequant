@@ -1,2 +1,2 @@
 .
-types-Pillow==9.5.0.5
+types-Pillow==10.0.0.3
