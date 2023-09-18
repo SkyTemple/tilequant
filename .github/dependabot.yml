@@ -5,16 +5,16 @@ updates:
     schedule:
       interval: "weekly"
     reviewers:
-      - "skytemple/maintainers"
+      - "skytemple/dependabot-reviewers"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
     reviewers:
-      - "skytemple/maintainers"
+      - "skytemple/dependabot-reviewers"
   - package-ecosystem: "gitsubmodule"
     directory: "/"
     schedule:
       interval: "daily"
     reviewers:
-      - "skytemple/maintainers"
+      - "skytemple/dependabot-reviewers"
