@@ -4,7 +4,17 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    reviewers:
+      - "skytemple/maintainers"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    reviewers:
+      - "skytemple/maintainers"
+  - package-ecosystem: "gitsubmodule"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    reviewers:
+      - "skytemple/maintainers"
