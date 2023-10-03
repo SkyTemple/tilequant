@@ -18,7 +18,7 @@ def do_simple_convert(
     colors_per_palette: int,
     tile_width: int,
     tile_height: int,
-    transparent_color: Optional[Color],
+    transparent_color: Color | None,
 ) -> Image.Image:
     legacy_convert = ImageConverter(
         image,

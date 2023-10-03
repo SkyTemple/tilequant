@@ -221,7 +221,7 @@ class ImageConverter:
 
         # Prepare all full image color quantization
         prepare_color_count = max_colors
-        quant_images: List[Tuple[int, Image, List[Color]]] = []
+        quant_images: list[tuple[int, Image, list[Color]]] = []
         while prepare_color_count > 0:
             q_result = self._quantize(img, prepare_color_count)
             quant_images.append((prepare_color_count, q_result[0], q_result[1]))
@@ -331,7 +331,7 @@ class ImageConverter:
         self._dbg_last_tile_quantized_img = img.copy()
         return img
 
-    def _quantize(self, img, color_count) -> Tuple[Image.Image, List[Color]]:
+    def _quantize(self, img, color_count) -> tuple[Image.Image, list[Color]]:
         """
         Reduces the colors in the entire image down to self._current_color_count
         :return:

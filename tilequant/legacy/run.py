@@ -45,7 +45,7 @@ class ConversionRun:
         # Input image, quantized to max color_count
         self.img: Image.Image = img
         # The colors in img
-        self.colors: List[Color] = colors
+        self.colors: list[Color] = colors
         # Tiling dimensions
         self._tile_width = tile_width
         self._tile_height = tile_height
@@ -55,7 +55,7 @@ class ConversionRun:
         # List of all possible palettes
         # In the end this will contain any number of palettes, but they will be merged by self._merge_palettes
         # and only up to self._num_palettes entries in this list will not be None.
-        self._palettes: List[Union[None, OrderedSet]] = []
+        self._palettes: list[Union[None, OrderedSet]] = []
         self.palettes = []
         # A list where each entry is one image tile and the values are lists of possible indices from self.palettes,
         # that the tile could use
@@ -142,7 +142,7 @@ class ConversionRun:
     def _tile_coord(self, tx, ty):
         return int(self.img.width / self._tile_width) * ty + tx
 
-    def _get_suitable_palettes(self, tile_pal: OrderedSet) -> List[int]:
+    def _get_suitable_palettes(self, tile_pal: OrderedSet) -> list[int]:
         """
         Check which palettes contain all colors of tile_pal.
         If tile_pal is instead a superset of any of the palettes, those palettes are updated with the colors
