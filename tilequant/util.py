@@ -16,7 +16,6 @@
 #  along with SkyTemple.  If not, see <https://www.gnu.org/licenses/>.
 import os
 
-from typing import Tuple
 
 Color = tuple[int, int, int]
 

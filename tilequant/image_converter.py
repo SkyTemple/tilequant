@@ -20,7 +20,6 @@ from __future__ import annotations
 import os
 from ctypes import cdll, c_int, POINTER, c_uint8, c_int32, memmove, byref, c_float
 from enum import Enum
-from typing import Optional, Tuple
 import platform
 
 from tilequant.legacy import do_simple_convert

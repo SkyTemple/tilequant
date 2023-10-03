@@ -4,8 +4,6 @@ These few remaining bits and pieces are simply for the "simple" conversion.
 """
 from __future__ import annotations
 
-from typing import Optional
-
 from PIL import Image
 
 from tilequant.legacy.image_converter import ImageConverter  # type: ignore

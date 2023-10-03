@@ -16,7 +16,7 @@
 #  You should have received a copy of the GNU General Public License
 #  along with SkyTemple.  If not, see <https://www.gnu.org/licenses/>.
 import math
-from typing import List, Optional, TypeVar
+from typing import Optional, TypeVar
 from collections.abc import Iterable, Sequence
 
 T = TypeVar("T")
