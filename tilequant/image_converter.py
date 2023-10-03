@@ -20,7 +20,6 @@ from __future__ import annotations
 import os
 from ctypes import cdll, c_int, POINTER, c_uint8, c_int32, memmove, byref, c_float
 from enum import Enum
-from typing import Optional, Tuple
 import platform
 
 from tilequant.legacy import do_simple_convert
@@ -59,7 +58,7 @@ class Tilequant:
     def __init__(
         self,
         img: Image.Image,
-        transparent_color: Optional[Color] = None,
+        transparent_color: Color | None = None,
         tile_width=8,
         tile_height=8,
         dl_name=None,
@@ -80,7 +79,7 @@ class Tilequant:
             img.height % tile_height == 0
         ), f"The image height must be divisible by {tile_height}"
         self._img = img.convert("RGBA").convert("RGBa")
-        self._transparent_color: Optional[Tuple[int, int, int, int]] = None
+        self._transparent_color: tuple[int, int, int, int] | None = None
         if transparent_color is not None:
             self._transparent_color = (
                 transparent_color[0],
@@ -91,7 +90,7 @@ class Tilequant:
         self.tile_width = tile_width
         self.tile_height = tile_height
         # The created image
-        self._out_img: Optional[Image.Image] = None
+        self._out_img: Image.Image | None = None
 
         # Init the library
         if dl_name is None:

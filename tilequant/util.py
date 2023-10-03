@@ -16,9 +16,8 @@
 #  along with SkyTemple.  If not, see <https://www.gnu.org/licenses/>.
 import os
 
-from typing import Tuple
 
-Color = Tuple[int, int, int]
+Color = tuple[int, int, int]
 
 
 # noinspection PyTypeChecker

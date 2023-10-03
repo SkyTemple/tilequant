@@ -4,8 +4,6 @@ These few remaining bits and pieces are simply for the "simple" conversion.
 """
 from __future__ import annotations
 
-from typing import Optional
-
 from PIL import Image
 
 from tilequant.legacy.image_converter import ImageConverter  # type: ignore
@@ -18,7 +16,7 @@ def do_simple_convert(
     colors_per_palette: int,
     tile_width: int,
     tile_height: int,
-    transparent_color: Optional[Color],
+    transparent_color: Color | None,
 ) -> Image.Image:
     legacy_convert = ImageConverter(
         image,

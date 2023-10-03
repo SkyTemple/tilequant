@@ -16,7 +16,8 @@
 #  You should have received a copy of the GNU General Public License
 #  along with SkyTemple.  If not, see <https://www.gnu.org/licenses/>.
 import math
-from typing import List, Iterable, Sequence, Optional, TypeVar
+from typing import Optional, TypeVar
+from collections.abc import Iterable, Sequence
 
 T = TypeVar("T")
 
@@ -55,12 +56,12 @@ class TransparencyHandler:
 
     def update_palettes(
         self, palettes: Sequence[Optional[Iterable[T]]]
-    ) -> List[Optional[OrderedSet[Optional[T]]]]:
+    ) -> list[Optional[OrderedSet[Optional[T]]]]:
         """
         Add the index for this transparent color to all palettes that are not None.
         The index is not filled with a color yet, this is done in set_transparent_color_in_palettes.
         """
-        new_palettes: List[Optional[OrderedSet[Optional[T]]]] = []
+        new_palettes: list[Optional[OrderedSet[Optional[T]]]] = []
         for p in palettes:
             if p is not None:
                 new_palettes.append(OrderedSet([None] + list(p)))
@@ -70,12 +71,12 @@ class TransparencyHandler:
 
     def set_transparent_color_in_palettes(
         self, palettes: Sequence[Optional[Sequence[T]]]
-    ) -> List[Optional[List[T]]]:
+    ) -> list[Optional[list[T]]]:
         """
         Set the first color in all None palettes to self.transparent_color or (0, 0, 0) if not defined
         """
         tc = self.transparent_color if self.transparent_color is not None else (0, 0, 0)
-        new_palettes: List[Optional[List[T]]] = []
+        new_palettes: list[Optional[list[T]]] = []
         for p in palettes:
             if p is not None:
                 new_palettes.append([tc] + list(p[1:]))

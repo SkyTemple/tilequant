@@ -16,7 +16,6 @@
 #  You should have received a copy of the GNU General Public License
 #  along with SkyTemple.  If not, see <https://www.gnu.org/licenses/>.
 import itertools
-from typing import List, Tuple
 
 from ordered_set import OrderedSet
 from sortedcollections import ValueSortedDict
@@ -29,7 +28,7 @@ class PaletteMerger:
     """
 
     def __init__(
-        self, palettes: List[OrderedSet], num_palettes: int, colors_per_palette: int
+        self, palettes: list[OrderedSet], num_palettes: int, colors_per_palette: int
     ):
         """
         :param palettes: A list of ordered sets of palettes
@@ -42,7 +41,7 @@ class PaletteMerger:
         self._current_number_of_palettes = len(palettes)
         self._num_palettes = num_palettes
         self._colors_per_palette = colors_per_palette
-        self._merges_performed: List[Tuple[int, int]] = []
+        self._merges_performed: list[tuple[int, int]] = []
         self._count_per_pal = ValueSortedDict(
             {pidx: -len(p) for pidx, p in enumerate(self._palettes)}
         )
@@ -124,5 +123,5 @@ class PaletteMerger:
         """Can be called after a successful try_to_merge to return a list of palettes to merge (in order)."""
         return self._merges_performed
 
-    def _merge_two_pal(self, pal_pair: Tuple[int, int]) -> OrderedSet:
+    def _merge_two_pal(self, pal_pair: tuple[int, int]) -> OrderedSet:
         return self._palettes[pal_pair[0]].union(self._palettes[pal_pair[1]])
