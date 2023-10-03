@@ -1,8 +1,5 @@
 [build-system]
-# 64+ is broken with editable:
-# - https://github.com/pypa/setuptools/issues/3518
-# - https://github.com/python/mypy/issues/13392
-requires = ['setuptools>=62.0, <64.0', 'wheel', 'setuptools_dso~=2.9']
+requires = ['setuptools', 'wheel', 'setuptools_dso~=2.9']
 build-backend = 'setuptools.build_meta'
 
 [project]
