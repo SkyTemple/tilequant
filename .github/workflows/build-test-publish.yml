@@ -122,7 +122,6 @@ jobs:
       - name: Build wheels
         run: python -m cibuildwheel --output-dir dist
         env:
-          CIBW_BUILD_LINUX: "${{ matrix.pythonver }}-manylinux*"
           CIBW_ARCHS: ${{ matrix.arch }}
       - name: Upload wheels
         uses: actions/upload-artifact@v3
