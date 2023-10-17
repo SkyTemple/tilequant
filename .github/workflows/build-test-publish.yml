@@ -56,50 +56,26 @@ jobs:
         pip install -e .
     - name: Analysing the code with pycln
       run: pycln tilequant -c -a
-
-  build_linux:
-    runs-on: ubuntu-latest
-    name: Wheel Linux
-    steps:
-      # For tags we assume the version in setup.py is correct!
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          submodules: 'recursive'
-      - name: Rewrite version for dev if not tag
-        if: "!startsWith(github.ref, 'refs/tags/')"
-        run: |
-          perl -i -pe "s/version\s*=\s*'(.*?)(\.rc.*|\.a.*|\.post.*)?'/version='\1.dev0+${GITHUB_SHA::8}'/" pyproject.toml
-      - name: Note version
-        run: |
-          echo "PACKAGE_VERSION=$(python3 -- ./setup.py --version)" >> $GITHUB_ENV
-      - name: Build Python wheels
-        uses: RalfG/python-wheels-manylinux-build@v0.5.0-manylinux2014_x86_64
-        with:
-          python-versions: 'cp39-cp39 cp310-cp310 cp311-cp311 cp312-cp312'
-      - name: Upload wheels
-        uses: actions/upload-artifact@v3
-        with:
-          name: wheels-linux
-          path: dist/*.whl
-  build_macos_windows:
+  build:
     runs-on: ${{ matrix.os }}
-    name: Mac/Win Wheel
+    name: Build Wheels
     strategy:
       fail-fast: false
       matrix:
-        os: [ macos-11, windows-2019 ]
-        python-version: [ '3.9', '3.10', '3.11', '3.12' ]
-        arch: [ 'x86_64', 'AMD64', 'x86', 'arm64' ]
-        exclude:
+        include:
+          - os: ubuntu-latest
+            arch: x86_64
+          # very slow:
+          #- os: ubuntu-latest
+          #  arch: arm64
           - os: macos-11
-            arch: 'x86'
-          - os: windows-2019
-            arch: 'arm64'
+            arch: x86_64
           - os: macos-11
-            arch: 'AMD64'
+            arch: arm64
           - os: windows-2019
-            arch: 'x86_64'
+            arch: x86
+          - os: windows-2019
+            arch: AMD64
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -109,31 +85,36 @@ jobs:
         if: "!startsWith(github.ref, 'refs/tags/')"
         shell: bash
         run: |
-          perl -i -pe "s/version\s*=\s*'(.*?)(\.rc.*|\.a.*|\.post.*)?'/version='\1.dev0+${GITHUB_SHA::8}'/" setup.py
+          perl -i -pe "s/__version__\s*=\s*'(.*?)(\.rc.*|\.a.*|\.post.*)?'/__version__='\1.dev0+${GITHUB_SHA::8}'/" setup.py
       - name: Note version
         shell: bash
         run: |
           echo "PACKAGE_VERSION=$(python3 -- ./setup.py --version)" >> $GITHUB_ENV
+      - name: Set up QEMU
+        if: runner.os == 'Linux'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.11"
       - name: Install cibuildwheel
         run: python -m pip install cibuildwheel
       - name: Build wheels
         run: python -m cibuildwheel --output-dir dist
         env:
+          CIBW_BUILD_LINUX: "${{ matrix.pythonver }}-manylinux*"
           CIBW_ARCHS: ${{ matrix.arch }}
       - name: Upload wheels
         uses: actions/upload-artifact@v3
         with:
-          name: wheels-${{ matrix.os }}
+          name: wheels
           path: dist/*.whl
+
   deploy:
     if: startsWith(github.ref, 'refs/tags/')
-    needs:
-      - build_linux
-      - build_macos_windows
+    needs: build
     runs-on: ubuntu-latest
     name: Deploy wheels to PyPI
     steps:
@@ -152,4 +133,4 @@ jobs:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
-          twine upload wheels-linux/*manylinux*.whl wheels-macos*/*.whl wheels-windows*/*.whl
+          twine upload wheels/*.whl
