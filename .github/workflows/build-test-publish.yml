@@ -30,7 +30,7 @@ jobs:
         with:
           submodules: 'recursive'
       - name: Set up Python 3.11
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
       - uses: psf/black@stable
@@ -46,7 +46,7 @@ jobs:
       with:
         submodules: 'recursive'
     - name: Set up Python 3.11
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: "3.11"
     - name: Install dependencies
@@ -109,7 +109,7 @@ jobs:
         run: |
           echo "PACKAGE_VERSION=$(python3 -- ./setup.py --version)" >> $GITHUB_ENV
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           architecture: ${{ matrix.arch }}
@@ -134,7 +134,7 @@ jobs:
       - name: Download wheels
         uses: actions/download-artifact@v3
       - name: Set up Python 3.11
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: 3.11
       - name: Upgrade pip
