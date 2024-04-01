@@ -22,7 +22,7 @@ classifiers = [
     'Programming Language :: Python :: 3.12',
 ]
 dependencies = [
-    'Pillow~=10.0.0',
+    'Pillow>=10.0,<10.4',
     'ordered-set~=4.1.0',
     'sortedcollections~=2.1.0',
     'click~=8.1.3',
