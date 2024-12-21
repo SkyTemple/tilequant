@@ -1,4 +1,5 @@
 """Module with a companion class for handling the use transparent colors."""
+
 #  Copyright 2020-2023 Capypara and the SkyTemple Contributors
 #
 #  This file is part of SkyTemple.
@@ -79,7 +80,7 @@ class TransparencyHandler:
         new_palettes: list[Optional[list[T]]] = []
         for p in palettes:
             if p is not None:
-                new_palettes.append([tc] + list(p[1:]))
+                new_palettes.append([tc] + list(p[1:]))  # type: ignore
             else:
                 new_palettes.append(None)
         return new_palettes
