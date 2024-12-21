@@ -11,16 +11,18 @@ jobs:
     strategy:
       max-parallel: 5
       matrix:
-        python-version: [ "3.9", "3.10", "3.11", "3.12" ]
+        python-version: [ "3.10", "3.11", "3.12", "3.13" ]
     steps:
     - uses: actions/checkout@v4
       with:
         submodules: 'recursive'
-    - uses: theCapypara/mypy-check@rust-support
-      name: Run type checks
-      with:
-        python_version: '${{ matrix.python-version }}'
-        requirements: '-r mypy-requirements.txt'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r mypy-requirements.txt mypy
+    - name: Run type checks
+      run: |
+        mypy tilequant
 
   code-formatting:
     runs-on: ubuntu-latest
@@ -30,111 +32,118 @@ jobs:
         with:
           submodules: 'recursive'
       - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
           python-version: "3.11"
-      - uses: psf/black@stable
-        with:
-          options: "--check -t py38"
-          src: tilequant
+      - name: Install ruff
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+      - name: Check with ruff
+        run: ruff format --check tilequant
 
-  import-check:
+  build-sdist:
+    name: Build SDist
     runs-on: ubuntu-latest
-    name: Check unused imports
     steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: 'recursive'
-    - name: Set up Python 3.11
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install pycln
-        pip install -e .
-    - name: Analysing the code with pycln
-      run: pycln tilequant -c -a
-
-  build_linux:
-    runs-on: ubuntu-latest
-    name: Wheel Linux
-    steps:
-      # For tags we assume the version in setup.py is correct!
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           submodules: 'recursive'
-      - name: Rewrite version for dev if not tag
-        if: "!startsWith(github.ref, 'refs/tags/')"
-        run: |
-          perl -i -pe "s/version\s*=\s*'(.*?)(\.rc.*|\.a.*|\.post.*)?'/version='\1.dev0+${GITHUB_SHA::8}'/" pyproject.toml
-      - name: Note version
-        run: |
-          echo "PACKAGE_VERSION=$(python3 -- ./setup.py --version)" >> $GITHUB_ENV
-      - name: Build Python wheels
-        uses: RalfG/python-wheels-manylinux-build@v0.5.0-manylinux2014_x86_64
+      - name: Build SDist
+        run: pipx run build --sdist
+      - uses: actions/upload-artifact@v4
         with:
-          python-versions: 'cp39-cp39 cp310-cp310 cp311-cp311 cp312-cp312'
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: wheels-linux
-          path: dist/*.whl
-  build_macos_windows:
+          name: wheels-sdist
+          path: dist/*.tar.gz
+
+  build:
     runs-on: ${{ matrix.os }}
-    name: Mac/Win Wheel
+    name: Build Wheels
     strategy:
       fail-fast: false
       matrix:
-        os: [ macos-11, windows-2019 ]
-        python-version: [ '3.9', '3.10', '3.11', '3.12' ]
-        arch: [ 'x64', 'x86' ]
-        exclude:
-          - os: macos-11
-            arch: 'x86'
+        include:
+          - os: ubuntu-24.04
+            arch: x86_64
+          - os: macos-13
+            arch: x86_64
+          - os: macos-14
+            arch: arm64
+          - os: windows-2019
+            arch: x86
+          - os: windows-2019
+            arch: AMD64
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: 'recursive'
+
       - name: Rewrite version for dev if not tag
         if: "!startsWith(github.ref, 'refs/tags/')"
         shell: bash
         run: |
-          perl -i -pe "s/version\s*=\s*'(.*?)(\.rc.*|\.a.*|\.post.*)?'/version='\1.dev0+${GITHUB_SHA::8}'/" setup.py
+          perl -i -pe "s/version\s*=\s*\"(.*?)(\.rc.*|\.a.*|\.post.*)?\"/version=\"\1.dev0+${GITHUB_SHA::8}\"/" pyproject.toml
       - name: Note version
+        if: matrix.os != 'windows-2019'
         shell: bash
         run: |
-          echo "PACKAGE_VERSION=$(python3 -- ./setup.py --version)" >> $GITHUB_ENV
+          python3 -m venv .yq-venv
+          . .yq-venv/bin/activate
+          pip install yq
+          echo "PACKAGE_VERSION=$(tomlq '.project.version' pyproject.toml -r)" >> $GITHUB_ENV
+      - name: Note version (Windows)
+        if: matrix.os == 'windows-2019'
+        run: |
+          pipx install yq
+          $env:PACKAGE_VERSION = tomlq.exe '.project.version' pyproject.toml -r
+          echo "PACKAGE_VERSION=$env:PACKAGE_VERSION" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Set up QEMU
+        if: runner.os == 'Linux'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
-          architecture: ${{ matrix.arch }}
-      - name: Upgrade pip
-        run: |
-          python -m pip install --upgrade pip wheel
-      - name: Build Python wheels
-        run: pip wheel -w ./dist  --no-deps .
+          python-version: "3.12"
+      - name: Download GNU Tar
+        uses: suisei-cn/actions-download-file@v1.6.0
+        if: "matrix.os == 'windows-2019'"
+        with:
+          url: https://skytemple.org/build_deps/tar.exe
+          target: "C:\\tarout"
+      - name: Prepend GNU Tar to Path
+        if: "matrix.os == 'windows-2019'"
+        shell: powershell
+        run:
+          echo "C:\tarout" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Install cibuildwheel
+        run: python -m pip install cibuildwheel
+      - name: Build wheels
+        run: python -m cibuildwheel --output-dir dist
+        env:
+          CIBW_ARCHS: ${{ matrix.arch }}
+          MACOSX_DEPLOYMENT_TARGET: "10.13"
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-${{ matrix.os }}-py${{ matrix.python-version }}-${{ matrix.arch }}
+          name: wheels-${{ matrix.os }}-${{ matrix.arch }}
           path: dist/*.whl
   deploy:
     if: startsWith(github.ref, 'refs/tags/')
     needs:
-      - build_linux
-      - build_macos_windows
+      - build
+      - build-sdist
+      - typechecks
     runs-on: ubuntu-latest
     name: Deploy wheels to PyPI
     steps:
       - name: Download wheels
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v3
       - name: Set up Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v4
         with:
           python-version: 3.11
       - name: Upgrade pip
@@ -146,4 +155,4 @@ jobs:
           TWINE_USERNAME: ${{ secrets.PYPI_USERNAME }}
           TWINE_PASSWORD: ${{ secrets.PYPI_PASSWORD }}
         run: |
-          twine upload wheels-linux/*manylinux*.whl wheels-macos*/*.whl wheels-windows*/*.whl
+          twine upload wheels*/*.whl wheels*/*.tar.gz

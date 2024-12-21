@@ -2,6 +2,7 @@
 Remnants of the legacy Python implementation of tilequant.
 These few remaining bits and pieces are simply for the "simple" conversion.
 """
+
 from __future__ import annotations
 
 from PIL import Image

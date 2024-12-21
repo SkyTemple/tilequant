@@ -5,9 +5,9 @@ build-backend = 'setuptools.build_meta'
 [project]
 name        = 'tilequant'
 description = 'Tool for quantizing image colors using tile-based palette restrictions'
-version     = '1.1.0'
+version     = '1.2.0'
 readme      = 'README.rst'
-requires-python = '>=3.9'
+requires-python = '>=3.10'
 authors = [
   { name='Marco "Capypara" Köpcke', email='hello@capypara.de' },
 ]
@@ -16,13 +16,13 @@ classifiers = [
     'Programming Language :: Python',
     'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
     'Topic :: Multimedia :: Graphics',
-    'Programming Language :: Python :: 3.9',
     'Programming Language :: Python :: 3.10',
     'Programming Language :: Python :: 3.11',
     'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: 3.13',
 ]
 dependencies = [
-    'Pillow~=10.0.0',
+    'Pillow>=10.0.0',
     'ordered-set~=4.1.0',
     'sortedcollections~=2.1.0',
     'click~=8.1.3',
