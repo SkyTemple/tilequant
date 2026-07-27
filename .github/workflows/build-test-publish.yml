@@ -65,13 +65,11 @@ jobs:
         include:
           - os: ubuntu-24.04
             arch: x86_64
-          - os: macos-13
-            arch: x86_64
           - os: macos-14
             arch: arm64
-          - os: windows-2019
+          - os: windows-2022
             arch: x86
-          - os: windows-2019
+          - os: windows-2022
             arch: AMD64
     steps:
       - name: Checkout
@@ -85,7 +83,7 @@ jobs:
         run: |
           perl -i -pe "s/version\s*=\s*\"(.*?)(\.rc.*|\.a.*|\.post.*)?\"/version=\"\1.dev0+${GITHUB_SHA::8}\"/" pyproject.toml
       - name: Note version
-        if: matrix.os != 'windows-2019'
+        if: matrix.os != 'windows-2022'
         shell: bash
         run: |
           python3 -m venv .yq-venv
@@ -93,7 +91,7 @@ jobs:
           pip install yq
           echo "PACKAGE_VERSION=$(tomlq '.project.version' pyproject.toml -r)" >> $GITHUB_ENV
       - name: Note version (Windows)
-        if: matrix.os == 'windows-2019'
+        if: matrix.os == 'windows-2022'
         run: |
           pipx install yq
           $env:PACKAGE_VERSION = tomlq.exe '.project.version' pyproject.toml -r
@@ -110,12 +108,12 @@ jobs:
           python-version: "3.12"
       - name: Download GNU Tar
         uses: suisei-cn/actions-download-file@v1.6.0
-        if: "matrix.os == 'windows-2019'"
+        if: "matrix.os == 'windows-2022'"
         with:
           url: https://skytemple.org/build_deps/tar.exe
           target: "C:\\tarout"
       - name: Prepend GNU Tar to Path
-        if: "matrix.os == 'windows-2019'"
+        if: "matrix.os == 'windows-2022'"
         shell: powershell
         run:
           echo "C:\tarout" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
