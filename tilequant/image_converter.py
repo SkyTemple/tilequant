@@ -73,12 +73,12 @@ class Tilequant:
         :param tile_height:         Height of a tile
         :param dl_name:             Path to the DLL or SO file for Tilequant, if not given, will auto-detect.
         """
-        assert (
-            img.width % tile_width == 0
-        ), f"The image width must be divisible by {tile_width}"
-        assert (
-            img.height % tile_height == 0
-        ), f"The image height must be divisible by {tile_height}"
+        assert img.width % tile_width == 0, (
+            f"The image width must be divisible by {tile_width}"
+        )
+        assert img.height % tile_height == 0, (
+            f"The image height must be divisible by {tile_height}"
+        )
         self._img = img.convert("RGBA").convert("RGBa")
         self._transparent_color: tuple[int, int, int, int] | None = None
         if transparent_color is not None:

@@ -53,12 +53,12 @@ class ImageConverter:
         :param transparent_color:   A single color value that should be treated as transparent, when doing
                                     the conversion with transparency enabled.
         """
-        assert (
-            img.width % tile_width == 0
-        ), f"The image width must be divisible by {tile_width}"
-        assert (
-            img.height % tile_height == 0
-        ), f"The image height must be divisible by {tile_height}"
+        assert img.width % tile_width == 0, (
+            f"The image width must be divisible by {tile_width}"
+        )
+        assert img.height % tile_height == 0, (
+            f"The image height must be divisible by {tile_height}"
+        )
         self._img = img.convert("RGB")
         self._tile_width = tile_width
         self._tile_height = tile_height
