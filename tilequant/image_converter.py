@@ -85,7 +85,7 @@ class Tilequant:
             self._transparent_color = (
                 transparent_color[0],
                 transparent_color[1],
-                transparent_color[2]
+                transparent_color[2],
             )
         self.tile_width = tile_width
         self.tile_height = tile_height
