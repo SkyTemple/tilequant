@@ -62,7 +62,11 @@ class ImageConverter:
         self._img = img.convert("RGB")
         self._tile_width = tile_width
         self._tile_height = tile_height
-        self._transparent_color = transparent_color
+        self._transparent_color = (
+            transparent_color[0],
+            transparent_color[1],
+            transparent_color[2],
+        )
         self._reset(0, 0, 0, NONE, 0, False, False)
 
     # noinspection PyAttributeOutsideInit
