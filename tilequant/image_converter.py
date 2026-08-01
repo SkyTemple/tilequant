@@ -80,12 +80,13 @@ class Tilequant:
             f"The image height must be divisible by {tile_height}"
         )
         self._img = img.convert("RGBA").convert("RGBa")
-        self._transparent_color: tuple[int, int, int] | None = None
+        self._transparent_color: tuple[int, int, int, int] | None = None
         if transparent_color is not None:
             self._transparent_color = (
                 transparent_color[0],
                 transparent_color[1],
                 transparent_color[2],
+                255,
             )
         self.tile_width = tile_width
         self.tile_height = tile_height
