@@ -62,7 +62,11 @@ class ImageConverter:
         self._img = img.convert("RGB")
         self._tile_width = tile_width
         self._tile_height = tile_height
-        self._transparent_color = transparent_color
+        self._transparent_color = (
+            transparent_color[0],
+            transparent_color[1],
+            transparent_color[2],
+        )
         self._reset(0, 0, 0, NONE, 0, False, False)
 
     # noinspection PyAttributeOutsideInit
@@ -437,10 +441,8 @@ class ImageConverter:
             # Fill rest of palette
             p = list(p)
             p.extend([(0, 0, 0)] * (self._colors_per_palette - len(p)))
-            for r, g, b in p:
-                cols.append(r)
-                cols.append(g)
-                cols.append(b)
+            for item in p:
+                cols.extend([item[0], item[1], item[2]])
         for i in range(processed_palette_count, self._num_palettes):
             cols += [0] * 3 * self._colors_per_palette
         im.putpalette(cols)
